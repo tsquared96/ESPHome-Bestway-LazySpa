@@ -1,0 +1,145 @@
+# Example Configuration: Bestway Paris 6-Wire 2021 Model (NO54173)
+# Tested by: @community
+# Date: 2024-01-15
+# 
+# Special notes:
+# - Standard 6-wire configuration
+# - Level shifter required (TXS0108E tested)
+# - No pull-up resistors needed
+# - All features working including jets
+
+substitutions:
+  device_name: layzspa-paris
+  friendly_name: "Hot Tub Paris"
+  model_type: "6wire_2021"
+  
+  # Pin configuration (standard for 6-wire)
+  cio_data_pin: GPIO5   # D1
+  cio_clk_pin: GPIO4    # D2
+  cio_cs_pin: GPIO0     # D3
+  dsp_data_pin: GPIO14  # D5
+  dsp_clk_pin: GPIO12   # D6
+  dsp_cs_pin: GPIO13    # D7
+  audio_pin: GPIO15     # D8
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  platform: ESP8266
+  board: d1_mini
+  
+  # Include the protocol header
+  includes:
+    - ../includes/spa_protocol.h
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  
+  # Static IP recommended for stability
+  manual_ip:
+    static_ip: 192.168.1.150
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+
+# Enable logging
+logger:
+  level: INFO  # Change to DEBUG for troubleshooting
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+# Enable OTA updates
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# Web server
+web_server:
+  port: 80
+
+# Include the main configuration
+# This example extends the advanced configuration
+<<: !include ../config/advanced.yaml
+
+# Model-specific customizations
+climate:
+  - id: !extend spa_climate
+    visual:
+      min_temperature: 20
+      max_temperature: 40
+      temperature_step: 1.0
+    
+    # Paris model supports 3 presets
+    preset:
+      - name: Home
+        default_target_temperature_low: 38°C
+      - name: Eco
+        default_target_temperature_low: 35°C
+      - name: Boost
+        default_target_temperature_low: 40°C
+
+# Paris model has jets
+switch:
+  - platform: template
+    name: "${friendly_name} Jets"
+    id: jets_control
+    icon: mdi:water
+    lambda: |-
+      return id(jets_active);
+    turn_on_action:
+      - lambda: |-
+          id(spa_communication).send_button_press(0x80);
+      - globals.set:
+          id: jets_active
+          value: 'true'
+      - delay: 30min  # Auto-off after 30 minutes
+      - switch.turn_off: jets_control
+    turn_off_action:
+      - lambda: |-
+          id(spa_communication).send_button_press(0x80);
+      - globals.set:
+          id: jets_active
+          value: 'false'
+
+# Custom automation for this model
+interval:
+  # Paris model specific: Clean cycles
+  - interval: 12h
+    then:
+      - if:
+          condition:
+            lambda: 'return id(current_temperature_c) < 30;'
+          then:
+            - switch.turn_on: filter_control
+            - delay: 3h
+            - switch.turn_off: filter_control
+
+# Status LED (optional - if you add an LED to GPIO2/D4)
+output:
+  - platform: gpio
+    pin: GPIO2
+    id: status_led
+    inverted: true
+
+# Blink LED based on status
+interval:
+  - interval: 1s
+    then:
+      - if:
+          condition:
+            lambda: 'return id(heater_active);'
+          then:
+            - output.turn_on: status_led
+            - delay: 100ms
+            - output.turn_off: status_led
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(filter_active);'
+                then:
+                  - output.turn_on: status_led
+                  - delay: 500ms
+                  - output.turn_off: status_led

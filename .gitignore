@@ -1,0 +1,45 @@
+# ESPHome
+.esphome/
+*.bin
+*.elf
+*.map
+
+# Secrets and personal config
+secrets.yaml
+secrets.yml
+custom_secrets.yaml
+*.local.yaml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+
+# Build directories
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Temporary files
+*.tmp
+*.temp
