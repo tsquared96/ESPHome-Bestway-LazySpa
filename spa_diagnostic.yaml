@@ -6,13 +6,51 @@ substitutions:
   device_name: spa-diagnostic
   friendly_name: "Spa Diagnostic"
 
-  # Pin Configuration - adjust to match your wiring
-  cio_data_pin: GPIO5   # D1
-  cio_clk_pin: GPIO4    # D2
-  cio_cs_pin: GPIO0     # D3
-  dsp_data_pin: GPIO14  # D5
-  dsp_clk_pin: GPIO12   # D6
-  dsp_cs_pin: GPIO13    # D7
+  # ============================================================
+  # PIN CONFIGURATION for 6-WIRE 2021 MODEL (Default)
+  # ============================================================
+  # This matches the configuration in your advanced YAML
+  #
+  # WIRING from SPA PUMP to ESP8266 D1 Mini (via level shifter):
+  #
+  # Spa Pin -> Level Shifter -> ESP8266 Pin
+  # ------------------------------------------------
+  # Pin 1 (5V)      -> HV        -> 5V/VIN
+  # Pin 2 (GND)     -> GND       -> GND
+  # Pin 3 (CIO Data) -> HV1<->LV1 -> D1 (GPIO5)  ← cio_data_pin
+  # Pin 4 (CIO Clk)  -> HV2<->LV2 -> D2 (GPIO4)  ← cio_clk_pin
+  # Pin 5 (CIO CS)   -> HV3<->LV3 -> D3 (GPIO0)  ← cio_cs_pin
+  # Pin 6 (DSP Data) -> HV4<->LV4 -> D5 (GPIO14) ← dsp_data_pin
+  # Pin 7 (DSP Clk)  -> HV5<->LV5 -> D6 (GPIO12) ← dsp_clk_pin
+  # Pin 8 (DSP CS)   -> HV6<->LV6 -> D7 (GPIO13) ← dsp_cs_pin
+  #
+  # NOTE: If you have a 4-WIRE MODEL, see commented section below
+  # ============================================================
+
+  cio_data_pin: GPIO5   # D1 - CIO Data (6-wire only)
+  cio_clk_pin: GPIO4    # D2 - CIO Clock (6-wire only)
+  cio_cs_pin: GPIO0     # D3 - CIO Chip Select (6-wire only)
+  dsp_data_pin: GPIO14  # D5 - DSP Data (all models)
+  dsp_clk_pin: GPIO12   # D6 - DSP Clock (all models)
+  dsp_cs_pin: GPIO13    # D7 - DSP Chip Select (all models)
+
+  # ============================================================
+  # ALTERNATIVE: For 4-WIRE MODELS (uncomment if you have 4-wire)
+  # ============================================================
+  # WIRING from SPA PUMP to ESP8266 D1 Mini (direct connection):
+  #
+  # Spa Pin -> ESP8266 Pin
+  # ------------------------------------------------
+  # Pin 1 (5V)      -> 5V/VIN
+  # Pin 2 (GND)     -> GND
+  # Pin 3 (DSP TX)  -> D5 (GPIO14)
+  # Pin 4 (CIO TX)  -> D7 (GPIO13)
+  #
+  # If you have a 4-wire model, uncomment these and comment the above:
+  # dsp_data_pin: GPIO14  # D5 - DSP TX
+  # dsp_clk_pin: GPIO14   # D5 - Not used on 4-wire
+  # dsp_cs_pin: GPIO13    # D7 - CIO TX
+  # ============================================================
 
 esphome:
   name: ${device_name}
