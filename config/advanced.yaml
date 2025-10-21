@@ -38,7 +38,7 @@ esphome:
   
   # Custom includes for advanced protocol handling
   includes:
-    - ../includes/spa_protocol.h
+    - spa_protocol.h
   
   on_boot:
     priority: -100
