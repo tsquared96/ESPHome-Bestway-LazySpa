@@ -160,7 +160,7 @@ sensor:
     name: "${friendly_name} Uptime"
     update_interval: 60s
 
-# Text sensors for diagnostic messages and info
+# Text sensor for diagnostic messages
 text_sensor:
   # Connection status
   - platform: template
@@ -174,22 +174,6 @@ text_sensor:
         return {"Waiting for spa data..."};
       }
     update_interval: 5s
-
-  # Instructions displayed in web interface
-  - platform: template
-    name: "${friendly_name} Instructions"
-    icon: mdi:help-circle
-    lambda: |-
-      return {
-        "DIAGNOSTIC MODE: "
-        "1) Flash this config to ESP8266. "
-        "2) Power on spa pump. "
-        "3) Watch DSP CS Active sensor - should toggle. "
-        "4) Check packet count - should increase. "
-        "5) If packet count stays 0: wiring issue. "
-        "6) If packet count increases: hardware OK, use advanced config."
-      };
-    update_interval: never
 
   # IP address
   - platform: wifi_info
@@ -282,3 +266,20 @@ button:
       - lambda: |-
           id(dsp_packet_count) = 0;
           ESP_LOGI("diagnostic", "Packet counter reset");
+
+# Instructions displayed in web interface
+text_sensor:
+  - platform: template
+    name: "${friendly_name} Instructions"
+    icon: mdi:help-circle
+    lambda: |-
+      return {
+        "DIAGNOSTIC MODE: "
+        "1) Flash this config to ESP8266. "
+        "2) Power on spa pump. "
+        "3) Watch DSP CS Active sensor - should toggle. "
+        "4) Check packet count - should increase. "
+        "5) If packet count stays 0: wiring issue. "
+        "6) If packet count increases: hardware OK, use advanced config."
+      };
+    update_interval: never
