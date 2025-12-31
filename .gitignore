@@ -1,0 +1,22 @@
+# ESPHome
+/.esphome/
+**/.pioenvs/
+**/.piolibdeps/
+**/lib/
+**/src/
+**/platformio.ini
+
+# Secrets
+secrets.yaml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+
+# Build
+*.bin
+*.elf
