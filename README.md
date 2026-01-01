@@ -436,7 +436,7 @@ MIT License
 
 ## Changelog
 
-### v1.0.0 (2025-01-01)
+### v1.0.0 (2026-01-01)
 - Initial release
 - 4-wire UART protocol support
 - Full climate entity
