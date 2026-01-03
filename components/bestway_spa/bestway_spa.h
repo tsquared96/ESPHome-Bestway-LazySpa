@@ -365,75 +365,55 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
 };
 
 // =============================================================================
-// SWITCH IMPLEMENTATIONS
+// SWITCH IMPLEMENTATION
 // =============================================================================
 
-class BestwaySpaHeaterSwitch : public switch_::Switch, public Component {
- public:
-  void set_parent(BestwaySpa *parent) { parent_ = parent; }
-  void write_state(bool state) override {
-    parent_->set_heater(state);
-    publish_state(state);
-  }
- protected:
-  BestwaySpa *parent_{nullptr};
+// Switch types
+enum SwitchType {
+  SWITCH_HEATER,
+  SWITCH_FILTER,
+  SWITCH_BUBBLES,
+  SWITCH_JETS,
+  SWITCH_LOCK,
+  SWITCH_POWER
 };
 
-class BestwaySpaFilterSwitch : public switch_::Switch, public Component {
+class BestwaySpaSwitch : public switch_::Switch, public Component {
  public:
   void set_parent(BestwaySpa *parent) { parent_ = parent; }
-  void write_state(bool state) override {
-    parent_->set_filter(state);
-    publish_state(state);
-  }
- protected:
-  BestwaySpa *parent_{nullptr};
-};
+  void set_switch_type(SwitchType type) { type_ = type; }
 
-class BestwaySpaBubblesSwitch : public switch_::Switch, public Component {
- public:
-  void set_parent(BestwaySpa *parent) { parent_ = parent; }
   void write_state(bool state) override {
-    parent_->set_bubbles(state);
-    publish_state(state);
-  }
- protected:
-  BestwaySpa *parent_{nullptr};
-};
+    if (parent_ == nullptr) return;
 
-class BestwaySpaJetsSwitch : public switch_::Switch, public Component {
- public:
-  void set_parent(BestwaySpa *parent) { parent_ = parent; }
-  void write_state(bool state) override {
-    if (parent_->has_jets()) {
-      parent_->set_jets(state);
-      publish_state(state);
+    switch (type_) {
+      case SWITCH_HEATER:
+        parent_->set_heater(state);
+        break;
+      case SWITCH_FILTER:
+        parent_->set_filter(state);
+        break;
+      case SWITCH_BUBBLES:
+        parent_->set_bubbles(state);
+        break;
+      case SWITCH_JETS:
+        if (parent_->has_jets()) {
+          parent_->set_jets(state);
+        }
+        break;
+      case SWITCH_LOCK:
+        parent_->set_lock(state);
+        break;
+      case SWITCH_POWER:
+        parent_->set_power(state);
+        break;
     }
-  }
- protected:
-  BestwaySpa *parent_{nullptr};
-};
-
-class BestwaySpaLockSwitch : public switch_::Switch, public Component {
- public:
-  void set_parent(BestwaySpa *parent) { parent_ = parent; }
-  void write_state(bool state) override {
-    parent_->set_lock(state);
     publish_state(state);
   }
- protected:
-  BestwaySpa *parent_{nullptr};
-};
 
-class BestwaySpaPowerSwitch : public switch_::Switch, public Component {
- public:
-  void set_parent(BestwaySpa *parent) { parent_ = parent; }
-  void write_state(bool state) override {
-    parent_->set_power(state);
-    publish_state(state);
-  }
  protected:
   BestwaySpa *parent_{nullptr};
+  SwitchType type_{SWITCH_HEATER};
 };
 
 }  // namespace bestway_spa
