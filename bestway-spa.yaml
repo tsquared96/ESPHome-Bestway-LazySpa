@@ -63,8 +63,9 @@ uart:
 # =============================================================================
 external_components:
   - source:
-      type: local
-      path: components
+      type: git
+      url: https://github.com/tsquared96/ESPHome-Bestway-LazySpa
+      ref: main
     components: [ bestway_spa ]
 
 # =============================================================================
