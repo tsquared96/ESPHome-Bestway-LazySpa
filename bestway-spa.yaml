@@ -1,10 +1,7 @@
 # Bestway Lay-Z-Spa ESPHome Configuration
-# Native ESPHome component - direct serial/SPI protocol communication
+# Direct serial communication - replaces Visualapproach firmware entirely
 #
-# Supports both 4-wire (2021+) and 6-wire (pre-2021) Bestway spa models
-# Based on VisualApproach hardware design and protocol documentation
-#
-# For hardware build instructions, see: https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA
+# Uses existing Visualapproach hardware (PCB with level shifters)
 
 substitutions:
   device_name: bestway-spa
@@ -16,28 +13,28 @@ esphome:
   comment: "Bestway Lay-Z-Spa Controller"
 
 esp8266:
-  board: nodemcuv2  # NodeMCU v2/v3 ESP8266
+  board: nodemcuv2  # Match your Visualapproach hardware
 
-# Enable logging (disable serial logging since UART is used for spa)
+# Enable logging
 logger:
   level: DEBUG
-  baud_rate: 0
+  baud_rate: 0  # Disable serial logging since UART is used for spa
 
 # Enable Home Assistant API
 api:
   encryption:
     key: !secret api_encryption_key
 
-# Enable OTA updates
+# Enable OTA
 ota:
   - platform: esphome
     password: !secret ota_password
 
-# WiFi configuration
+# WiFi
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-
+  
   ap:
     ssid: "${friendly_name} Fallback"
     password: !secret fallback_password
@@ -46,9 +43,7 @@ wifi:
 web_server:
   port: 80
 
-# =============================================================================
-# UART Configuration (used for both 4-wire UART and 6-wire CS/timing)
-# =============================================================================
+# UART configuration for spa communication
 uart:
   id: spa_uart
   tx_pin: GPIO1   # D10/TX on NodeMCU
@@ -58,72 +53,21 @@ uart:
   parity: NONE
   stop_bits: 1
 
-# =============================================================================
-# Custom Component
-# =============================================================================
+# Custom component
 external_components:
   - source:
       type: local
       path: components
     components: [ bestway_spa ]
 
-# =============================================================================
-# CLIMATE CONFIGURATION
-# =============================================================================
-#
-# Protocol options:
-#   4WIRE      - 2021+ models using UART (most common)
-#   6WIRE      - Pre-2021 models using SPI-like protocol (TYPE1)
-#   6WIRE_T1   - Same as 6WIRE (TYPE1)
-#   6WIRE_T2   - 6-wire TYPE2 (54149E model)
-#
-# Model options (affects button codes and features):
-#   PRE2021    - Pre-2021 6-wire model (TYPE1)
-#   P05504     - 6-wire TYPE1 variant
-#   54149E     - 6-wire TYPE2 model
-#   54123      - 4-wire, no jets, no air
-#   54138      - 4-wire with jets and air
-#   54144      - 4-wire with jets
-#   54154      - 4-wire basic (default)
-#   54173      - 4-wire with jets and air
-#
-# =============================================================================
-
+# Main climate control with full sensors
 climate:
   - platform: bestway_spa
     id: hot_tub
     name: "${friendly_name}"
     uart_id: spa_uart
-
-    # =========================================================================
-    # PROTOCOL CONFIGURATION - Choose ONE of these configurations:
-    # =========================================================================
-
-    # --- Option A: 4-Wire UART (2021+ models) ---
-    protocol_type: 4WIRE
-    model: "54154"  # Change to match your model number
-
-    # --- Option B: 6-Wire TYPE1 (Pre-2021 models) ---
-    # Uncomment and configure pins for 6-wire:
-    # protocol_type: 6WIRE
-    # model: PRE2021
-    # clk_pin: GPIO14   # D5 - Clock
-    # data_pin: GPIO12  # D6 - Data (bidirectional)
-    # cs_pin: GPIO13    # D7 - Chip Select
-    # audio_pin: GPIO15 # D8 - Audio/Buzzer (optional)
-
-    # --- Option C: 6-Wire TYPE2 (54149E model) ---
-    # protocol_type: 6WIRE_T2
-    # model: 54149E
-    # clk_pin: GPIO14
-    # data_pin: GPIO12
-    # cs_pin: GPIO13
-    # audio_pin: GPIO15
-
-    # =========================================================================
-    # SENSORS
-    # =========================================================================
-
+    protocol_type: 4WIRE  # Use "6WIRE" for pre-2021 models
+    
     # Temperature sensors
     current_temperature:
       name: "${friendly_name} Current Temperature"
@@ -131,93 +75,67 @@ climate:
         - sliding_window_moving_average:
             window_size: 3
             send_every: 1
-
+    
     target_temperature:
       name: "${friendly_name} Target Temperature"
-
-    # Binary sensors for state monitoring
+    
+    # Binary sensors
     heating:
       name: "${friendly_name} Heating"
       device_class: heat
-
+    
     filter:
       name: "${friendly_name} Filter Running"
       device_class: running
-
+    
     bubbles:
-      name: "${friendly_name} Bubbles"
+      name: "${friendly_name} Bubbles Running"
       device_class: running
-
-    jets:
-      name: "${friendly_name} Jets"
-      device_class: running
-
-    power:
-      name: "${friendly_name} Power"
-      device_class: power
-
+    
     locked:
       name: "${friendly_name} Child Lock"
       device_class: lock
-
+    
     error:
       name: "${friendly_name} Error"
       device_class: problem
-
-    # Text sensors
+    
+    # Error code text
     error_text:
       name: "${friendly_name} Error Code"
 
-    display_text:
-      name: "${friendly_name} Display"
-
-# =============================================================================
-# CONTROL SWITCHES
-# =============================================================================
-
+# Control switches
 switch:
-  - platform: bestway_spa_power
-    name: "${friendly_name} Power"
-    icon: mdi:power
-    bestway_spa_id: hot_tub
-
   - platform: bestway_spa_heater
     name: "${friendly_name} Heater"
     icon: mdi:radiator
     bestway_spa_id: hot_tub
-
+  
   - platform: bestway_spa_filter
     name: "${friendly_name} Filter Pump"
     icon: mdi:air-filter
     bestway_spa_id: hot_tub
-
+  
   - platform: bestway_spa_bubbles
     name: "${friendly_name} Air Bubbles"
     icon: mdi:chart-bubble
     bestway_spa_id: hot_tub
-
-  - platform: bestway_spa_jets
-    name: "${friendly_name} Jets"
-    icon: mdi:waves
-    bestway_spa_id: hot_tub
-
+  
   - platform: bestway_spa_lock
     name: "${friendly_name} Child Lock"
     icon: mdi:lock
     bestway_spa_id: hot_tub
 
-# =============================================================================
-# SYSTEM SENSORS
-# =============================================================================
-
+# System sensors
 sensor:
   - platform: wifi_signal
     name: "${friendly_name} WiFi Signal"
     update_interval: 60s
-
+  
   - platform: uptime
     name: "${friendly_name} Uptime"
 
+# WiFi info
 text_sensor:
   - platform: wifi_info
     ip_address:
@@ -225,10 +143,7 @@ text_sensor:
     ssid:
       name: "${friendly_name} SSID"
 
-# =============================================================================
-# STATUS LED
-# =============================================================================
-
+# Status LED (built-in)
 status_led:
   pin:
     number: GPIO2
