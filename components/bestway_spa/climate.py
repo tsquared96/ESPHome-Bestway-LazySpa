@@ -7,6 +7,7 @@ from esphome.const import (
     CONF_NAME,
     DEVICE_CLASS_TEMPERATURE,
     STATE_CLASS_MEASUREMENT,
+    UNIT_CELSIUS,
 )
 
 from . import bestway_spa_ns, BestwaySpa, CONF_BESTWAY_SPA_ID
@@ -94,11 +95,13 @@ CONFIG_SCHEMA = cv.All(
 
             # Temperature sensors
             cv.Optional(CONF_CURRENT_TEMPERATURE): sensor.sensor_schema(
+                unit_of_measurement=UNIT_CELSIUS,
                 device_class=DEVICE_CLASS_TEMPERATURE,
                 state_class=STATE_CLASS_MEASUREMENT,
                 accuracy_decimals=1,
             ),
             cv.Optional(CONF_TARGET_TEMPERATURE): sensor.sensor_schema(
+                unit_of_measurement=UNIT_CELSIUS,
                 device_class=DEVICE_CLASS_TEMPERATURE,
                 state_class=STATE_CLASS_MEASUREMENT,
                 accuracy_decimals=1,
