@@ -1,0 +1,103 @@
+# Test configuration for CI - uses local components
+substitutions:
+  device_name: bestway-spa
+  friendly_name: "Hot Tub"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+
+esp8266:
+  board: nodemcuv2
+
+logger:
+  level: DEBUG
+  baud_rate: 0
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${friendly_name} Fallback"
+    password: !secret fallback_password
+
+uart:
+  id: spa_uart
+  tx_pin: GPIO1
+  rx_pin: GPIO3
+  baud_rate: 9600
+
+# Use LOCAL components for CI testing
+external_components:
+  - source: components
+    components: [ bestway_spa ]
+
+climate:
+  - platform: bestway_spa
+    id: hot_tub
+    name: "${friendly_name}"
+    uart_id: spa_uart
+    protocol_type: 4WIRE
+    model: "54154"
+
+    current_temperature:
+      name: "${friendly_name} Current Temperature"
+    target_temperature:
+      name: "${friendly_name} Target Temperature"
+    heating:
+      name: "${friendly_name} Heating"
+    filter:
+      name: "${friendly_name} Filter Running"
+    bubbles:
+      name: "${friendly_name} Bubbles"
+    jets:
+      name: "${friendly_name} Jets"
+    power:
+      name: "${friendly_name} Power"
+    locked:
+      name: "${friendly_name} Child Lock"
+    error:
+      name: "${friendly_name} Error"
+    error_text:
+      name: "${friendly_name} Error Code"
+    display_text:
+      name: "${friendly_name} Display"
+
+switch:
+  - platform: bestway_spa
+    name: "${friendly_name} Power"
+    type: power
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    name: "${friendly_name} Heater"
+    type: heater
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    name: "${friendly_name} Filter Pump"
+    type: filter
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    name: "${friendly_name} Air Bubbles"
+    type: bubbles
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    name: "${friendly_name} Jets"
+    type: jets
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    name: "${friendly_name} Child Lock"
+    type: lock
+    bestway_spa_id: hot_tub

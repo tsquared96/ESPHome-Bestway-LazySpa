@@ -1,0 +1,37 @@
+name: ESPHome Build
+
+on:
+  push:
+    branches: [ main, 'claude/**' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ESPHome
+        run: pip install esphome
+
+      - name: Create secrets.yaml
+        run: |
+          cat > secrets.yaml << 'EOF'
+          wifi_ssid: "test_ssid"
+          wifi_password: "test_password"
+          api_encryption_key: "u9ZgZveBSYhosX1ZdPCEc9e7W530+EkmzFY0HiEmfmI="
+          ota_password: "test_ota_password"
+          fallback_password: "test_fallback"
+          EOF
+
+      - name: Validate ESPHome config
+        run: esphome config bestway-spa-test.yaml
+
+      - name: Compile ESPHome firmware
+        run: esphome compile bestway-spa-test.yaml
