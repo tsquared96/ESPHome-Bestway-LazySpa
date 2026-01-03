@@ -65,7 +65,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/tsquared96/ESPHome-Bestway-LazySpa
-      ref: main
+      ref: claude/implement-6-wire-protocol-EExzb
     components: [ bestway_spa ]
 
 # =============================================================================
