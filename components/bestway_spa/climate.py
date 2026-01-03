@@ -88,7 +88,7 @@ CONFIG_SCHEMA = cv.All(
 
             # 6-wire pin configuration
             cv.Optional(CONF_CLK_PIN): pins.gpio_output_pin_schema,
-            cv.Optional(CONF_DATA_PIN): pins.internal_gpio_pin_schema,
+            cv.Optional(CONF_DATA_PIN): pins.internal_gpio_output_pin_schema,
             cv.Optional(CONF_CS_PIN): pins.gpio_output_pin_schema,
             cv.Optional(CONF_AUDIO_PIN): pins.gpio_output_pin_schema,
 
