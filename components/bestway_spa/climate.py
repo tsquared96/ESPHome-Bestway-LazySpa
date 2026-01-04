@@ -48,9 +48,9 @@ def validate_6wire_pins(config):
     return config
 
 
-# Use cv.Schema instead of climate.CLIMATE_SCHEMA for ESPHome 2024+ compatibility
+# Use climate._CLIMATE_SCHEMA for ESPHome 2024+ (CLIMATE_SCHEMA is now private)
 CONFIG_SCHEMA = cv.All(
-    cv.Schema({
+    climate._CLIMATE_SCHEMA.extend({
         cv.GenerateID(): cv.declare_id(BestwaySpa),
 
         # Protocol configuration
