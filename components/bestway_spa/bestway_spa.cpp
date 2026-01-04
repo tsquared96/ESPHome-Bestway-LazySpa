@@ -769,52 +769,56 @@ char BestwaySpa::decode_7segment_(uint8_t segments, bool is_type1_proto) {
 // =============================================================================
 
 void BestwaySpa::set_power(bool state) {
-  if (state_.power != state) {
-    if (protocol_type_ == PROTOCOL_4WIRE) {
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    if (state_.power != state) {
       state_.power = state;
-    } else {
-      toggles_.power_pressed = true;
-      ESP_LOGD(TAG, "Requested power %s", state ? "ON" : "OFF");
     }
+  } else {
+    // 6-wire: Always queue button press - it's a toggle
+    toggles_.power_pressed = true;
+    ESP_LOGI(TAG, "Requested power toggle (want %s)", state ? "ON" : "OFF");
   }
 }
 
 void BestwaySpa::set_heater(bool state) {
-  if (state_.heater_enabled != state) {
-    if (protocol_type_ == PROTOCOL_4WIRE) {
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    if (state_.heater_enabled != state) {
       state_.heater_enabled = state;
       if (state && !state_.filter_pump) {
         state_.filter_pump = true;
       }
-    } else {
-      toggles_.heat_pressed = true;
-      ESP_LOGD(TAG, "Requested heater %s", state ? "ON" : "OFF");
     }
+  } else {
+    // 6-wire: Always queue button press - it's a toggle
+    toggles_.heat_pressed = true;
+    ESP_LOGI(TAG, "Requested heater toggle (want %s)", state ? "ON" : "OFF");
   }
 }
 
 void BestwaySpa::set_filter(bool state) {
-  if (state_.filter_pump != state) {
-    if (protocol_type_ == PROTOCOL_4WIRE) {
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    if (state_.filter_pump != state) {
       state_.filter_pump = state;
       if (!state && state_.heater_enabled) {
         state_.heater_enabled = false;
       }
-    } else {
-      toggles_.pump_pressed = true;
-      ESP_LOGD(TAG, "Requested filter %s", state ? "ON" : "OFF");
     }
+  } else {
+    // 6-wire: Always queue button press - it's a toggle
+    toggles_.pump_pressed = true;
+    ESP_LOGI(TAG, "Requested filter toggle (want %s)", state ? "ON" : "OFF");
   }
 }
 
 void BestwaySpa::set_bubbles(bool state) {
-  if (state_.bubbles != state) {
-    if (protocol_type_ == PROTOCOL_4WIRE) {
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    if (state_.bubbles != state) {
       state_.bubbles = state;
-    } else {
-      toggles_.bubbles_pressed = true;
-      ESP_LOGD(TAG, "Requested bubbles %s", state ? "ON" : "OFF");
     }
+  } else {
+    // 6-wire: Always queue button press - it's a toggle
+    toggles_.bubbles_pressed = true;
+    ESP_LOGI(TAG, "Requested bubbles toggle (want %s)", state ? "ON" : "OFF");
   }
 }
 
@@ -824,24 +828,26 @@ void BestwaySpa::set_jets(bool state) {
     return;
   }
 
-  if (state_.jets != state) {
-    if (protocol_type_ == PROTOCOL_4WIRE) {
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    if (state_.jets != state) {
       state_.jets = state;
-    } else {
-      toggles_.jets_pressed = true;
-      ESP_LOGD(TAG, "Requested jets %s", state ? "ON" : "OFF");
     }
+  } else {
+    // 6-wire: Always queue button press - it's a toggle
+    toggles_.jets_pressed = true;
+    ESP_LOGI(TAG, "Requested jets toggle (want %s)", state ? "ON" : "OFF");
   }
 }
 
 void BestwaySpa::set_lock(bool state) {
-  if (state_.locked != state) {
-    if (protocol_type_ == PROTOCOL_4WIRE) {
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    if (state_.locked != state) {
       state_.locked = state;
-    } else {
-      toggles_.lock_pressed = true;
-      ESP_LOGD(TAG, "Requested lock %s", state ? "ON" : "OFF");
     }
+  } else {
+    // 6-wire: Always queue button press - it's a toggle
+    toggles_.lock_pressed = true;
+    ESP_LOGI(TAG, "Requested lock toggle (want %s)", state ? "ON" : "OFF");
   }
 }
 
