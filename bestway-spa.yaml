@@ -66,7 +66,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/tsquared96/ESPHome-Bestway-LazySpa
-      ref: 6ee4ea54a8fc3f545882c965582b4b65f62fb8fc
+      ref: 3045d498593b1db3234f6a21c1704b622aea70b9
     components: [ bestway_spa ]
 
 # Option 2: Use local path (if you cloned the repo locally)
