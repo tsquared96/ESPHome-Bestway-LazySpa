@@ -217,8 +217,9 @@ void BestwaySpa::dump_config() {
 
 climate::ClimateTraits BestwaySpa::traits() {
   auto traits = climate::ClimateTraits();
-  traits.set_supports_current_temperature(true);
-  traits.set_supports_two_point_target_temperature(false);
+  traits.add_supported_mode(climate::CLIMATE_MODE_OFF);
+  traits.add_supported_mode(climate::CLIMATE_MODE_HEAT);
+  traits.add_supported_mode(climate::CLIMATE_MODE_FAN_ONLY);
 
   // Temperature range depends on unit
   if (state_.unit_celsius) {
@@ -230,11 +231,6 @@ climate::ClimateTraits BestwaySpa::traits() {
   }
 
   traits.set_visual_temperature_step(1.0f);
-  traits.set_supported_modes({
-    climate::CLIMATE_MODE_OFF,
-    climate::CLIMATE_MODE_HEAT,
-    climate::CLIMATE_MODE_FAN_ONLY
-  });
 
   return traits;
 }

@@ -160,7 +160,7 @@ void CIO_TYPE1::update_states() {
 void IRAM_ATTR CIO_TYPE1::eop_handler() {
   // End of packet - set data pin to input
 #ifdef ESP8266
-  WRITE_PERI_REG(PIN_DIR_INPUT, 1 << data_pin_);
+  GPEC = (1 << data_pin_);  // GPIO Enable Clear - set as input
 #else
   pinMode(data_pin_, INPUT);
 #endif
@@ -201,7 +201,7 @@ void IRAM_ATTR CIO_TYPE1::eop_handler() {
 
 void IRAM_ATTR CIO_TYPE1::isr_packet_handler() {
 #ifdef ESP8266
-  if (READ_PERI_REG(PIN_IN) & (1 << cs_pin_)) {
+  if (GPI & (1 << cs_pin_)) {  // GPIO Input register
 #else
   if (digitalRead(cs_pin_)) {
 #endif
@@ -220,7 +220,7 @@ void IRAM_ATTR CIO_TYPE1::isr_clk_handler() {
     return;
 
 #ifdef ESP8266
-  bool clockstate = READ_PERI_REG(PIN_IN) & (1 << clk_pin_);
+  bool clockstate = GPI & (1 << clk_pin_);  // GPIO Input register
 #else
   bool clockstate = digitalRead(clk_pin_);
 #endif
@@ -229,13 +229,13 @@ void IRAM_ATTR CIO_TYPE1::isr_clk_handler() {
   if (!clockstate && data_is_output_) {
     if (button_code_ & (1 << send_bit_)) {
 #ifdef ESP8266
-      WRITE_PERI_REG(PIN_OUT_SET, 1 << data_pin_);
+      GPOS = (1 << data_pin_);  // GPIO Output Set
 #else
       digitalWrite(data_pin_, HIGH);
 #endif
     } else {
 #ifdef ESP8266
-      WRITE_PERI_REG(PIN_OUT_CLEAR, 1 << data_pin_);
+      GPOC = (1 << data_pin_);  // GPIO Output Clear
 #else
       digitalWrite(data_pin_, LOW);
 #endif
@@ -248,7 +248,7 @@ void IRAM_ATTR CIO_TYPE1::isr_clk_handler() {
   // Read bits on rising edge (clock high)
   if (clockstate && !data_is_output_) {
 #ifdef ESP8266
-    received_byte_ = (received_byte_ >> 1) | (((READ_PERI_REG(PIN_IN) & (1 << data_pin_)) > 0) << 7);
+    received_byte_ = (received_byte_ >> 1) | (((GPI & (1 << data_pin_)) > 0) << 7);
 #else
     received_byte_ = (received_byte_ >> 1) | (digitalRead(data_pin_) << 7);
 #endif
@@ -268,7 +268,7 @@ void IRAM_ATTR CIO_TYPE1::isr_clk_handler() {
         send_bit_ = 8;
         data_is_output_ = true;
 #ifdef ESP8266
-        WRITE_PERI_REG(PIN_DIR_OUTPUT, 1 << data_pin_);
+        GPES = (1 << data_pin_);  // GPIO Enable Set - set as output
 #else
         pinMode(data_pin_, OUTPUT);
 #endif
