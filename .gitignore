@@ -20,3 +20,4 @@ secrets.yaml
 # Build
 *.bin
 *.elf
+__pycache__/
