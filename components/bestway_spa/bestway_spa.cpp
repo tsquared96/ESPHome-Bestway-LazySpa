@@ -48,7 +48,8 @@ static volatile uint32_t g_bad_packets = 0;    // Bad packet counter
 #endif
 
 // CS (Chip Select) falling edge - start of packet
-void IRAM_ISR cio_cs_falling_isr() {
+void IRAM_ISR cio_cs_falling_isr(void *arg) {
+  (void)arg;  // Unused but required by ESPHome API
   g_cs_count++;
   g_cio_bit_count = 0;
   g_cio_byte_count = 0;
@@ -61,7 +62,8 @@ void IRAM_ISR cio_cs_falling_isr() {
 }
 
 // CS rising edge - end of packet
-void IRAM_ISR cio_cs_rising_isr() {
+void IRAM_ISR cio_cs_rising_isr(void *arg) {
+  (void)arg;  // Unused but required by ESPHome API
   // Validate packet length (should be 11 bytes = 88 bits for TYPE1)
   if (g_cio_byte_count >= 11 || (g_cio_byte_count == 10 && g_cio_bit_count > 0)) {
     g_cio_packet_ready = true;
@@ -71,7 +73,8 @@ void IRAM_ISR cio_cs_rising_isr() {
 }
 
 // CLK rising edge - sample data bit and output button bit
-void IRAM_ISR cio_clk_rising_isr() {
+void IRAM_ISR cio_clk_rising_isr(void *arg) {
+  (void)arg;  // Unused but required by ESPHome API
   if (g_spa_instance == nullptr) return;
 
   g_clk_count++;
@@ -137,7 +140,7 @@ void BestwaySpa::setup() {
     if (clk_pin_ != nullptr) {
       clk_pin_->setup();
       clk_pin_->pin_mode(gpio::FLAG_INPUT);
-      clk_pin_->attach_interrupt(&cio_clk_rising_isr, gpio::INTERRUPT_RISING_EDGE);
+      clk_pin_->attach_interrupt(cio_clk_rising_isr, this, gpio::INTERRUPT_RISING_EDGE);
       ESP_LOGD(TAG, "CLK interrupt attached on GPIO%d", clk_pin_->get_pin());
     }
 
@@ -153,7 +156,7 @@ void BestwaySpa::setup() {
       cs_pin_->pin_mode(gpio::FLAG_INPUT);
       // Note: ESPHome doesn't support CHANGE interrupt directly
       // We'll use falling edge and detect rising in loop
-      cs_pin_->attach_interrupt(&cio_cs_falling_isr, gpio::INTERRUPT_FALLING_EDGE);
+      cs_pin_->attach_interrupt(cio_cs_falling_isr, this, gpio::INTERRUPT_FALLING_EDGE);
       ESP_LOGD(TAG, "CS interrupt attached on GPIO%d", cs_pin_->get_pin());
     }
 
@@ -318,8 +321,11 @@ void BestwaySpa::dump_config() {
 
 climate::ClimateTraits BestwaySpa::traits() {
   auto traits = climate::ClimateTraits();
-  traits.set_supports_current_temperature(true);
-  traits.set_supports_two_point_target_temperature(false);
+
+  // Use feature flags for modern ESPHome API
+  traits.add_supported_mode(climate::CLIMATE_MODE_OFF);
+  traits.add_supported_mode(climate::CLIMATE_MODE_HEAT);
+  traits.add_supported_mode(climate::CLIMATE_MODE_FAN_ONLY);
 
   // Temperature range depends on unit
   if (state_.unit_celsius) {
@@ -331,11 +337,6 @@ climate::ClimateTraits BestwaySpa::traits() {
   }
 
   traits.set_visual_temperature_step(1.0f);
-  traits.set_supported_modes({
-    climate::CLIMATE_MODE_OFF,
-    climate::CLIMATE_MODE_HEAT,
-    climate::CLIMATE_MODE_FAN_ONLY
-  });
 
   return traits;
 }
