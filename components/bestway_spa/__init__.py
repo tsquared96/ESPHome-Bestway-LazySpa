@@ -90,49 +90,48 @@ def validate_6wire_pins(config):
     return config
 
 
+# Build schema - compatible with ESPHome 2024+ API
+_BASE_CLIMATE_SCHEMA = cv.Schema({
+    cv.GenerateID(): cv.declare_id(BestwaySpa),
+
+    # Protocol configuration
+    cv.Optional(CONF_PROTOCOL_TYPE, default="4WIRE"): cv.enum(PROTOCOL_TYPES, upper=True),
+    cv.Optional(CONF_MODEL, default="54154"): cv.enum(SPA_MODELS, upper=True),
+
+    # 6-wire pin configuration
+    cv.Optional(CONF_CLK_PIN): pins.gpio_output_pin_schema,
+    cv.Optional(CONF_DATA_PIN): pins.internal_gpio_pin_schema,
+    cv.Optional(CONF_CS_PIN): pins.gpio_output_pin_schema,
+    cv.Optional(CONF_AUDIO_PIN): pins.gpio_output_pin_schema,
+
+    # Temperature sensors
+    cv.Optional(CONF_CURRENT_TEMPERATURE): sensor.sensor_schema(
+        device_class=DEVICE_CLASS_TEMPERATURE,
+        state_class=STATE_CLASS_MEASUREMENT,
+        accuracy_decimals=1,
+    ),
+    cv.Optional(CONF_TARGET_TEMPERATURE): sensor.sensor_schema(
+        device_class=DEVICE_CLASS_TEMPERATURE,
+        state_class=STATE_CLASS_MEASUREMENT,
+        accuracy_decimals=1,
+    ),
+
+    # Binary sensors
+    cv.Optional(CONF_HEATING): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_FILTER): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_BUBBLES): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_JETS): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_LOCKED): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_POWER): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_ERROR): binary_sensor.binary_sensor_schema(),
+
+    # Text sensors
+    cv.Optional(CONF_ERROR_TEXT): text_sensor.text_sensor_schema(),
+    cv.Optional(CONF_DISPLAY_TEXT): text_sensor.text_sensor_schema(),
+})
+
 CONFIG_SCHEMA = cv.All(
-    climate.CLIMATE_SCHEMA.extend(
-        {
-            cv.GenerateID(): cv.declare_id(BestwaySpa),
-
-            # Protocol configuration
-            cv.Optional(CONF_PROTOCOL_TYPE, default="4WIRE"): cv.enum(PROTOCOL_TYPES, upper=True),
-            cv.Optional(CONF_MODEL, default="54154"): cv.enum(SPA_MODELS, upper=True),
-
-            # 6-wire pin configuration
-            cv.Optional(CONF_CLK_PIN): pins.gpio_output_pin_schema,
-            cv.Optional(CONF_DATA_PIN): pins.internal_gpio_pin_schema,
-            cv.Optional(CONF_CS_PIN): pins.gpio_output_pin_schema,
-            cv.Optional(CONF_AUDIO_PIN): pins.gpio_output_pin_schema,
-
-            # Temperature sensors
-            cv.Optional(CONF_CURRENT_TEMPERATURE): sensor.sensor_schema(
-                device_class=DEVICE_CLASS_TEMPERATURE,
-                state_class=STATE_CLASS_MEASUREMENT,
-                accuracy_decimals=1,
-            ),
-            cv.Optional(CONF_TARGET_TEMPERATURE): sensor.sensor_schema(
-                device_class=DEVICE_CLASS_TEMPERATURE,
-                state_class=STATE_CLASS_MEASUREMENT,
-                accuracy_decimals=1,
-            ),
-
-            # Binary sensors
-            cv.Optional(CONF_HEATING): binary_sensor.binary_sensor_schema(),
-            cv.Optional(CONF_FILTER): binary_sensor.binary_sensor_schema(),
-            cv.Optional(CONF_BUBBLES): binary_sensor.binary_sensor_schema(),
-            cv.Optional(CONF_JETS): binary_sensor.binary_sensor_schema(),
-            cv.Optional(CONF_LOCKED): binary_sensor.binary_sensor_schema(),
-            cv.Optional(CONF_POWER): binary_sensor.binary_sensor_schema(),
-            cv.Optional(CONF_ERROR): binary_sensor.binary_sensor_schema(),
-
-            # Text sensors
-            cv.Optional(CONF_ERROR_TEXT): text_sensor.text_sensor_schema(),
-            cv.Optional(CONF_DISPLAY_TEXT): text_sensor.text_sensor_schema(),
-        }
-    )
-    .extend(uart.UART_DEVICE_SCHEMA)
-    .extend(cv.COMPONENT_SCHEMA),
+    _BASE_CLIMATE_SCHEMA.extend(uart.UART_DEVICE_SCHEMA).extend(cv.COMPONENT_SCHEMA),
     validate_6wire_pins,
 )
 
