@@ -7,53 +7,16 @@
  *
  * Based on: https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA
  * Original author: visualapproach
+ *
+ * NOTE: Button and State enums are defined in bestway_spa.h to avoid conflicts.
+ * This file only contains the button CODE ARRAYS for each model.
+ * Must be included AFTER bestway_spa.h
  */
 
 #include <stdint.h>
 
 namespace esphome {
 namespace bestway_spa {
-
-// =============================================================================
-// Button Index Enumeration - Same for all models
-// =============================================================================
-
-enum ButtonIndex : uint8_t {
-  BTN_NOBTN = 0,     // No button pressed
-  BTN_LOCK,          // Lock/Unlock button
-  BTN_TIMER,         // Timer button
-  BTN_BUBBLES,       // Bubbles/Air button
-  BTN_UNIT,          // Temperature unit (C/F) button
-  BTN_HEAT,          // Heat button
-  BTN_PUMP,          // Filter pump button
-  BTN_DOWN,          // Temperature down button
-  BTN_UP,            // Temperature up button
-  BTN_POWER,         // Power button
-  BTN_JETS,          // HydroJets button (if available)
-  BTN_COUNT          // Number of buttons
-};
-
-// =============================================================================
-// State Index Enumeration - For state tracking
-// =============================================================================
-
-enum StateIndex : uint8_t {
-  STATE_LOCKED = 0,
-  STATE_POWER,
-  STATE_UNIT,
-  STATE_BUBBLES,
-  STATE_HEATGRN,
-  STATE_HEATRED,
-  STATE_HEAT,
-  STATE_PUMP,
-  STATE_CHAR1,
-  STATE_CHAR2,
-  STATE_CHAR3,
-  STATE_JETS,
-  STATE_GOD,      // Game of Death mode
-  STATE_TIMER,
-  STATE_COUNT
-};
 
 // =============================================================================
 // BUTTON CODES BY MODEL - From VisualApproach
