@@ -70,11 +70,22 @@ void BestwaySpa::setup() {
     cio_type1_.set_has_jets(has_jets());
     cio_type1_.set_has_air(has_air());
 
+    // Check if DSP pins are separate from CIO pins
+    bool has_separate_dsp_pins = (dsp_data_pin_ != nullptr) && (dsp_clk_pin_ != nullptr) && (dsp_cs_pin_ != nullptr);
+
     // Initialize CIO handler (interrupt-driven, receives FROM CIO board)
     cio_type1_.setup(cio_data, cio_clk, cio_cs);
 
-    // Initialize DSP handler (bit-banging, sends TO DSP board)
-    dsp_type1_.setup(dsp_data, dsp_clk, dsp_cs, audio);
+    // Only initialize DSP handler if we have separate pins (man-in-the-middle setup)
+    if (has_separate_dsp_pins) {
+      dsp_type1_.setup(dsp_data, dsp_clk, dsp_cs, audio);
+      dsp_initialized_ = true;
+      ESP_LOGI(TAG, "DSP handler initialized with separate pins");
+    } else {
+      dsp_initialized_ = false;
+      ESP_LOGW(TAG, "No separate DSP pins configured - DSP output disabled");
+      ESP_LOGW(TAG, "For man-in-middle setup, configure dsp_clk_pin, dsp_data_pin, dsp_cs_pin");
+    }
 
     ESP_LOGI(TAG, "6-wire TYPE1 initialized - CIO: data=%d clk=%d cs=%d, DSP: data=%d clk=%d cs=%d audio=%d",
              cio_data, cio_clk, cio_cs, dsp_data, dsp_clk, dsp_cs, audio);
@@ -275,19 +286,27 @@ void BestwaySpa::control(const climate::ClimateCall &call) {
 // =============================================================================
 
 void BestwaySpa::handle_6wire_type1_protocol_() {
+  // Check for new packet BEFORE update_states() clears the flag
+  bool has_new_data = cio_type1_.is_new_packet_available();
+
   // Update CIO states from interrupt-received data
   cio_type1_.update_states();
 
-  // Check if we have new data from CIO
-  if (cio_type1_.is_new_packet_available()) {
-    // Sync CIO state to our state and DSP
+  // If we had new data, sync to DSP (and our internal state)
+  if (has_new_data) {
     sync_cio_to_dsp_();
   }
 
-  // Get button presses from DSP and handle them
-  Buttons button = dsp_type1_.get_pressed_button();
-  if (button != NOBTN) {
-    handle_button_press_(button);
+  // DSP operations only if DSP is initialized
+  if (dsp_initialized_) {
+    // Get button presses from DSP and handle them
+    Buttons button = dsp_type1_.get_pressed_button();
+    if (button != NOBTN) {
+      handle_button_press_(button);
+    }
+
+    // Update DSP display with current states
+    dsp_type1_.handle_states();
   }
 
   // Handle pending button from ESPHome controls
@@ -307,15 +326,19 @@ void BestwaySpa::handle_6wire_type1_protocol_() {
       temp_adjust_steps_++;
     }
   }
-
-  // Update DSP display with current states
-  dsp_type1_.handle_states();
 }
 
 void BestwaySpa::sync_cio_to_dsp_() {
   // Get CIO states
   CIOStates &cio = cio_type1_.get_states();
   DSPStates &dsp = dsp_type1_.get_states();
+
+  // Debug: log raw payload and decoded characters
+  uint8_t *raw = cio_type1_.get_raw_payload();
+  ESP_LOGD(TAG, "CIO Raw: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+           raw[0], raw[1], raw[2], raw[3], raw[4], raw[5], raw[6], raw[7], raw[8], raw[9], raw[10]);
+  ESP_LOGD(TAG, "CIO Chars: '%c' '%c' '%c' Temp:%d Power:%d Heat:%d Pump:%d",
+           cio.char1, cio.char2, cio.char3, cio.temperature, cio.power, cio.heat, cio.pump);
 
   // Copy state from CIO to DSP
   dsp.locked = cio.locked;

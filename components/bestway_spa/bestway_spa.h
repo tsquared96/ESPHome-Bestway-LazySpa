@@ -230,6 +230,9 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   Buttons pending_button_{NOBTN};
   int temp_adjust_steps_{0};
   bool power_on_pending_{false};
+
+  // 6-wire DSP state
+  bool dsp_initialized_{false};
 };
 
 // =============================================================================
