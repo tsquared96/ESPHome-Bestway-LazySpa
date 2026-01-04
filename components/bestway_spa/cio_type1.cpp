@@ -261,7 +261,7 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
       // When we receive 0x42 (DSP_CMD2_DATAREAD), we start sending button code
       if (_current_byte == DSP_CMD2_DATAREAD_TYPE1) {
         _data_is_output = true;
-        _send_bit = 8;  // Button code starts at bit 8 (byte 1 of 2-byte code)
+        _send_bit = 0;  // Start at bit 0, send all 16 bits
       }
 
       _current_byte = 0;
@@ -273,7 +273,7 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
     // ===================
 
     if (_data_is_output && _dsp_data_pin >= 0) {
-      // Send button code bit (bits 8-15 of the 16-bit button code)
+      // Send button code bit (LSB first, all 16 bits)
       bool bit_val = (_button_code >> _send_bit) & 1;
 
 #ifdef ESP8266
@@ -289,9 +289,9 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
 
       _send_bit++;
 
-      // Button code is 16 bits, we send bits 8-15 (the high byte)
-      if (_send_bit > 15) {
-        _send_bit = 8;
+      // Button code is 16 bits total
+      if (_send_bit >= 16) {
+        _send_bit = 0;
         _data_is_output = false;  // Done sending button code
       }
     }
