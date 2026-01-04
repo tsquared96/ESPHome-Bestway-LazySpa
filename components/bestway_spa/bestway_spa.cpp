@@ -296,9 +296,19 @@ void BestwaySpa::handle_6wire_type1_protocol_() {
     uint32_t bad = cio_type1_.get_bad_packets();
     uint32_t cs_int = cio_type1_.get_cs_interrupts();
     uint32_t clk_int = cio_type1_.get_clk_interrupts();
-    ESP_LOGI(TAG, "CIO: pkts=%u(+%u) bad=%u | ISR: cs=%u(+%u) clk=%u(+%u)",
+
+    // Read raw pin states for debugging
+    int cs_pin = cio_cs_pin_ ? cio_cs_pin_->get_pin() : -1;
+    int clk_pin = cio_clk_pin_ ? cio_clk_pin_->get_pin() : -1;
+    int data_pin = cio_data_pin_ ? cio_data_pin_->get_pin() : -1;
+    int cs_state = (cs_pin >= 0) ? digitalRead(cs_pin) : -1;
+    int clk_state = (clk_pin >= 0) ? digitalRead(clk_pin) : -1;
+    int data_state = (data_pin >= 0) ? digitalRead(data_pin) : -1;
+
+    ESP_LOGI(TAG, "CIO: pkts=%u(+%u) bad=%u | ISR: cs=%u(+%u) clk=%u(+%u) | Pins: cs=%d clk=%d data=%d",
              good, good - last_good_packets, bad,
-             cs_int, cs_int - last_cs_int, clk_int, clk_int - last_clk_int);
+             cs_int, cs_int - last_cs_int, clk_int, clk_int - last_clk_int,
+             cs_state, clk_state, data_state);
     last_good_packets = good;
     last_cs_int = cs_int;
     last_clk_int = clk_int;
