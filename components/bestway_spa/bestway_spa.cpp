@@ -150,7 +150,11 @@ void BestwaySpa::setup() {
     }
   }
 
-  // Initialize climate state
+  // Initialize climate state - default to power ON and heating enabled
+  state_.power = true;
+  state_.heater_enabled = true;
+  state_.filter_pump = true;  // Filter must run for heater to work
+
   this->mode = climate::CLIMATE_MODE_HEAT;
   this->action = climate::CLIMATE_ACTION_IDLE;
   this->current_temperature = state_.current_temp;
