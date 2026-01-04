@@ -222,6 +222,11 @@ void IRAM_ATTR CioType1::isr_packetHandler() {
     _packet_active = false;
     _data_is_output = false;
 
+    // Switch DSP_DATA pin back to INPUT for physical button pass-through
+    if (_dsp_data_pin >= 0) {
+      pinMode(_dsp_data_pin, INPUT);
+    }
+
     // Validate packet length (should be 11 bytes = 88 bits)
     // Accept if we got at least 10 complete bytes
     if (_byte_count >= 11 || (_byte_count == 10 && _bit_count > 0)) {
@@ -295,12 +300,17 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
 
       // Check if CIO is requesting button data
       // Original VisualApproach triggers on DSP_CMD2_DATAREAD (0x42)
-      // Some spa variants use 0xFE instead. Trigger on either.
-      // Also trigger at byte positions 2, 4, 6 as fallback (command byte positions)
+      // Some spa variants use 0xFE instead.
+      // Trigger ONCE per packet at position 3 (after storing byte 2 = command byte)
+      // This matches the original protocol timing.
+      bool is_button_window = (_byte_count == 3);
       bool is_cmd_byte = (_current_byte == 0x42 || _current_byte == 0xFE);
-      bool is_cmd_position = (_byte_count == 3 || _byte_count == 5 || _byte_count == 7);
 
-      if (is_cmd_byte || is_cmd_position) {
+      // Only drive the line if we have an actual button to send (not NOBTN)
+      // This allows physical display buttons to pass through when ESP isn't pressing anything
+      bool has_button_to_send = (_button_code != 0x1B1B);
+
+      if (is_button_window && has_button_to_send) {
         _data_is_output = true;
         _send_bit = 8;  // Start at bit 8, send bits 8-15 only (matching VisualApproach)
 
@@ -319,7 +329,7 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
     // ===================
 
     if (_data_is_output && _dsp_data_pin >= 0) {
-      // Send button code bit (matching VisualApproach: bits 8-15 only)
+      // Send button code bit (matching VisualApproach: continuous cycling)
       bool bit_val = (_button_code >> _send_bit) & 1;
 
 #ifdef ESP8266
@@ -335,16 +345,11 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
 
       _send_bit++;
 
-      // Original VisualApproach sends bits 8-15, then cycles back
-      // After bit 15, reset to bit 8 (or 0 to stop)
-      if (_send_bit >= 16) {
-        _send_bit = 8;  // Cycle back to bit 8 for continuous button holding
-        _data_is_output = false;  // Done with this transmission window
-
-        // Switch DSP_DATA pin back to INPUT for pass-through
-        if (_dsp_data_pin >= 0) {
-          pinMode(_dsp_data_pin, INPUT);
-        }
+      // Original VisualApproach: cycle continuously through all 16 bits
+      // _data_is_output stays true until CS goes high (packet end)
+      // Button bits wrap from 15 back to 0 for continuous transmission
+      if (_send_bit > 15) {
+        _send_bit = 0;  // Wrap back to bit 0 (matches original: if(_send_bit > 15) _send_bit = 0)
       }
     }
   }

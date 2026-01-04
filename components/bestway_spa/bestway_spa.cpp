@@ -779,7 +779,7 @@ void BestwaySpa::update_sensors_() {
 
 void BestwaySpa::queue_button_(Buttons button, int duration_ms) {
   if (!button_enabled_[button]) {
-    ESP_LOGD(TAG, "Button %d is disabled", button);
+    ESP_LOGI(TAG, "Button %d is disabled, ignoring", button);
     return;
   }
 
@@ -790,8 +790,14 @@ void BestwaySpa::queue_button_(Buttons button, int duration_ms) {
   item.target_state = 0xFF;
   item.target_value = 0;
 
+  // Check for invalid button code (0x0000 = not implemented for this model)
+  if (item.button_code == 0x0000) {
+    ESP_LOGW(TAG, "Button %d has no valid code (0x0000) for this model", button);
+    return;
+  }
+
   button_queue_.push_back(item);
-  ESP_LOGD(TAG, "Queued button %d (code 0x%04X) for %dms", button, item.button_code, duration_ms);
+  ESP_LOGI(TAG, "Queued button %d (code 0x%04X) for %dms", button, item.button_code, duration_ms);
 }
 
 void BestwaySpa::process_button_queue_() {
