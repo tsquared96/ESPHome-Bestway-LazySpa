@@ -13,7 +13,6 @@
 #include "bestway_spa.h"
 #include "cio_type1.h"
 #include "cio_type2.h"
-#include "model_specific.h"
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
 #include <Arduino.h>
