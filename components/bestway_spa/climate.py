@@ -121,7 +121,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_DISPLAY_TEXT): text_sensor.text_sensor_schema(),
         }
     )
-    .extend(climate.CLIMATE_SCHEMA)
+    .extend(climate._CLIMATE_SCHEMA)
     .extend(uart.UART_DEVICE_SCHEMA)
     .extend(cv.COMPONENT_SCHEMA),
     validate_6wire_pins,
