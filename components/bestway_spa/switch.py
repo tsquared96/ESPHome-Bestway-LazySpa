@@ -5,8 +5,6 @@ from esphome.const import CONF_ID, CONF_TYPE
 
 from . import bestway_spa_ns, BestwaySpa, CONF_BESTWAY_SPA_ID
 
-DEPENDENCIES = ["bestway_spa"]
-
 # Switch classes
 BestwaySpaHeaterSwitch = bestway_spa_ns.class_("BestwaySpaHeaterSwitch", switch.Switch, cg.Component)
 BestwaySpaFilterSwitch = bestway_spa_ns.class_("BestwaySpaFilterSwitch", switch.Switch, cg.Component)
@@ -24,20 +22,31 @@ SWITCH_TYPES = {
     "power": BestwaySpaPowerSwitch,
 }
 
-CONFIG_SCHEMA = (
-    switch.switch_schema(switch.Switch)
-    .extend({
-        cv.GenerateID(CONF_BESTWAY_SPA_ID): cv.use_id(BestwaySpa),
-        cv.Required(CONF_TYPE): cv.one_of(*SWITCH_TYPES, lower=True),
-    })
-    .extend(cv.COMPONENT_SCHEMA)
-)
+
+def _create_switch_schema(switch_class):
+    """Create a schema for a specific switch type."""
+    return (
+        switch.switch_schema(switch_class)
+        .extend({
+            cv.GenerateID(): cv.declare_id(switch_class),
+            cv.GenerateID(CONF_BESTWAY_SPA_ID): cv.use_id(BestwaySpa),
+        })
+        .extend(cv.COMPONENT_SCHEMA)
+    )
+
+
+# Use typed_schema to properly declare ID types for each switch type
+CONFIG_SCHEMA = cv.typed_schema({
+    "heater": _create_switch_schema(BestwaySpaHeaterSwitch),
+    "filter": _create_switch_schema(BestwaySpaFilterSwitch),
+    "bubbles": _create_switch_schema(BestwaySpaBubblesSwitch),
+    "jets": _create_switch_schema(BestwaySpaJetsSwitch),
+    "lock": _create_switch_schema(BestwaySpaLockSwitch),
+    "power": _create_switch_schema(BestwaySpaPowerSwitch),
+})
 
 
 async def to_code(config):
-    switch_type = config[CONF_TYPE]
-    switch_class = SWITCH_TYPES[switch_type]
-
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     await switch.register_switch(var, config)
