@@ -82,6 +82,7 @@ void IRAM_ATTR cio_clk_rising_isr() {
   g_clk_count++;
 
   // Read bit from CIO (DATA line) - direct GPIO read
+  // Pin should be INPUT at this point
   bool bit_value = digitalRead(g_data_pin);
 
   // Store bit in buffer (MSB first)
@@ -96,11 +97,17 @@ void IRAM_ATTR cio_clk_rising_isr() {
   }
 
   // Output button code bit (MSB first, 16 bits)
+  // Switch to OUTPUT to drive the line, then back to INPUT
   if (g_dsp_bit_count < 16) {
     int bit_pos = 15 - g_dsp_bit_count;
     bool out_bit = (g_dsp_button_code >> bit_pos) & 0x01;
-    // Direct GPIO write for speed
+
+    // Switch to output, write bit, switch back to input
+    // This briefly drives the DATA line to transmit button code to CIO
+    pinMode(g_data_pin, OUTPUT);
     digitalWrite(g_data_pin, out_bit);
+    pinMode(g_data_pin, INPUT);
+
     g_dsp_bit_count++;
   }
 }
