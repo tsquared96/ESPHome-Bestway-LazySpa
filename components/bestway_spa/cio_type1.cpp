@@ -294,12 +294,15 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
       }
 
       // Check if CIO is requesting button data
-      // Originally we looked for 0x42 command, but some spa variants don't use it.
-      // Instead, trigger button output after receiving byte 7 (after display data)
-      // This is when the CIO typically expects button response.
-      if (_byte_count == 8) {  // After byte 7 is stored (0-indexed)
+      // Original VisualApproach triggers on DSP_CMD2_DATAREAD (0x42)
+      // Some spa variants use 0xFE instead. Trigger on either.
+      // Also trigger at byte positions 2, 4, 6 as fallback (command byte positions)
+      bool is_cmd_byte = (_current_byte == 0x42 || _current_byte == 0xFE);
+      bool is_cmd_position = (_byte_count == 3 || _byte_count == 5 || _byte_count == 7);
+
+      if (is_cmd_byte || is_cmd_position) {
         _data_is_output = true;
-        _send_bit = 0;  // Start at bit 0, send all 16 bits
+        _send_bit = 8;  // Start at bit 8, send bits 8-15 only (matching VisualApproach)
 
         // Switch DSP_DATA pin to OUTPUT mode for button transmission
         if (_dsp_data_pin >= 0) {
@@ -316,7 +319,7 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
     // ===================
 
     if (_data_is_output && _dsp_data_pin >= 0) {
-      // Send button code bit (LSB first, all 16 bits)
+      // Send button code bit (matching VisualApproach: bits 8-15 only)
       bool bit_val = (_button_code >> _send_bit) & 1;
 
 #ifdef ESP8266
@@ -332,10 +335,11 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
 
       _send_bit++;
 
-      // Button code is 16 bits total
+      // Original VisualApproach sends bits 8-15, then cycles back
+      // After bit 15, reset to bit 8 (or 0 to stop)
       if (_send_bit >= 16) {
-        _send_bit = 0;
-        _data_is_output = false;  // Done sending button code
+        _send_bit = 8;  // Cycle back to bit 8 for continuous button holding
+        _data_is_output = false;  // Done with this transmission window
 
         // Switch DSP_DATA pin back to INPUT for pass-through
         if (_dsp_data_pin >= 0) {
