@@ -47,26 +47,31 @@ static volatile uint32_t g_bad_packets = 0;    // Bad packet counter
 // INTERRUPT SERVICE ROUTINES FOR 6-WIRE (Arduino native)
 // =============================================================================
 
-// CS (Chip Select) falling edge - start of packet
-void IRAM_ATTR cio_cs_falling_isr() {
+// CS (Chip Select) change - handles both falling (start) and rising (end) edges
+void IRAM_ATTR cio_cs_change_isr() {
+  if (g_cs_pin < 0) return;
+
+  bool cs_high = digitalRead(g_cs_pin);
   g_cs_count++;
-  g_cio_bit_count = 0;
-  g_cio_byte_count = 0;
-  g_dsp_bit_count = 0;
 
-  // Clear buffer
-  for (int i = 0; i < 11; i++) {
-    g_cio_buffer[i] = 0;
-  }
-}
+  if (!cs_high) {
+    // CS went LOW - falling edge - start of packet
+    g_cio_bit_count = 0;
+    g_cio_byte_count = 0;
+    g_dsp_bit_count = 0;
 
-// CS rising edge - end of packet
-void IRAM_ATTR cio_cs_rising_isr() {
-  // Validate packet length (should be 11 bytes = 88 bits for TYPE1)
-  if (g_cio_byte_count >= 11 || (g_cio_byte_count == 10 && g_cio_bit_count > 0)) {
-    g_cio_packet_ready = true;
+    // Clear buffer
+    for (int i = 0; i < 11; i++) {
+      g_cio_buffer[i] = 0;
+    }
   } else {
-    g_bad_packets++;
+    // CS went HIGH - rising edge - end of packet
+    // Validate packet length (should be 11 bytes = 88 bits for TYPE1)
+    if (g_cio_byte_count >= 11 || (g_cio_byte_count == 10 && g_cio_bit_count > 0)) {
+      g_cio_packet_ready = true;
+    } else {
+      g_bad_packets++;
+    }
   }
 }
 
@@ -152,8 +157,8 @@ void BestwaySpa::setup() {
       g_cs_pin = cs_pin_->get_pin();
       pinMode(g_cs_pin, INPUT);
       // Use CHANGE to detect both falling (start) and rising (end) edges
-      attachInterrupt(digitalPinToInterrupt(g_cs_pin), cio_cs_falling_isr, FALLING);
-      ESP_LOGD(TAG, "CS interrupt attached on GPIO%d (Arduino native)", g_cs_pin);
+      attachInterrupt(digitalPinToInterrupt(g_cs_pin), cio_cs_change_isr, CHANGE);
+      ESP_LOGD(TAG, "CS interrupt attached on GPIO%d with CHANGE mode", g_cs_pin);
     }
 
     // Audio pin (optional) - OUTPUT
