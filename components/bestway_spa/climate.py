@@ -88,9 +88,9 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_PROTOCOL_TYPE, default="4WIRE"): cv.enum(PROTOCOL_TYPES, upper=True),
             cv.Optional(CONF_MODEL, default="54154"): cv.enum(SPA_MODELS, upper=True),
 
-            # 6-wire pin configuration (CIO pins are inputs, audio is output)
+            # 6-wire pin configuration (we set modes manually in C++)
             cv.Optional(CONF_CLK_PIN): pins.internal_gpio_input_pin_schema,
-            cv.Optional(CONF_DATA_PIN): pins.internal_gpio_pin_schema,  # Bidirectional
+            cv.Optional(CONF_DATA_PIN): pins.internal_gpio_output_pin_schema,  # Bidirectional, set manually
             cv.Optional(CONF_CS_PIN): pins.internal_gpio_input_pin_schema,
             cv.Optional(CONF_AUDIO_PIN): pins.gpio_output_pin_schema,
 
