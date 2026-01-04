@@ -233,6 +233,24 @@ switch:
     icon: mdi:thermometer
     bestway_spa_id: hot_tub
 
+  - platform: bestway_spa
+    type: timer
+    name: "${friendly_name} Timer"
+    icon: mdi:timer
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    type: up
+    name: "${friendly_name} Temp Up"
+    icon: mdi:arrow-up-bold
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    type: down
+    name: "${friendly_name} Temp Down"
+    icon: mdi:arrow-down-bold
+    bestway_spa_id: hot_tub
+
 # =============================================================================
 # SYSTEM SENSORS
 # =============================================================================

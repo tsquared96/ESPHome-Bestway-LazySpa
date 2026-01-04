@@ -460,5 +460,43 @@ class BestwaySpaUnitSwitch : public switch_::Switch, public Component {
   BestwaySpa *parent_{nullptr};
 };
 
+class BestwaySpaTimerSwitch : public switch_::Switch, public Component {
+ public:
+  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void write_state(bool state) override {
+    parent_->set_timer(state ? 1 : 0);  // Toggle timer
+    publish_state(state);
+  }
+ protected:
+  BestwaySpa *parent_{nullptr};
+};
+
+// Button switches - for triggering single button presses
+class BestwaySpaUpButton : public switch_::Switch, public Component {
+ public:
+  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void write_state(bool state) override {
+    if (state) {
+      parent_->adjust_target_temp(1);  // +1 degree
+    }
+    publish_state(false);  // Momentary - always return to off
+  }
+ protected:
+  BestwaySpa *parent_{nullptr};
+};
+
+class BestwaySpaDownButton : public switch_::Switch, public Component {
+ public:
+  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void write_state(bool state) override {
+    if (state) {
+      parent_->adjust_target_temp(-1);  // -1 degree
+    }
+    publish_state(false);  // Momentary - always return to off
+  }
+ protected:
+  BestwaySpa *parent_{nullptr};
+};
+
 }  // namespace bestway_spa
 }  // namespace esphome
