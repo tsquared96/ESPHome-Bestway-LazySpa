@@ -188,32 +188,38 @@ climate:
 # =============================================================================
 
 switch:
-  - platform: bestway_spa_power
+  - platform: bestway_spa
+    type: power
     name: "${friendly_name} Power"
     icon: mdi:power
     bestway_spa_id: hot_tub
 
-  - platform: bestway_spa_heater
+  - platform: bestway_spa
+    type: heater
     name: "${friendly_name} Heater"
     icon: mdi:radiator
     bestway_spa_id: hot_tub
 
-  - platform: bestway_spa_filter
+  - platform: bestway_spa
+    type: filter
     name: "${friendly_name} Filter Pump"
     icon: mdi:air-filter
     bestway_spa_id: hot_tub
 
-  - platform: bestway_spa_bubbles
+  - platform: bestway_spa
+    type: bubbles
     name: "${friendly_name} Air Bubbles"
     icon: mdi:chart-bubble
     bestway_spa_id: hot_tub
 
-  - platform: bestway_spa_jets
+  - platform: bestway_spa
+    type: jets
     name: "${friendly_name} Jets"
     icon: mdi:waves
     bestway_spa_id: hot_tub
 
-  - platform: bestway_spa_lock
+  - platform: bestway_spa
+    type: lock
     name: "${friendly_name} Child Lock"
     icon: mdi:lock
     bestway_spa_id: hot_tub
