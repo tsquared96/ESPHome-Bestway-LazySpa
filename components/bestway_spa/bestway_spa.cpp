@@ -1,6 +1,7 @@
 #include "bestway_spa.h"
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
+#include <Arduino.h>
 
 namespace esphome {
 namespace bestway_spa {
@@ -26,6 +27,11 @@ static const uint32_t PACKET_TIMEOUT_MS = 100;
 // ISR needs access to the instance - we support only one spa per ESP
 static BestwaySpa *g_spa_instance = nullptr;
 
+// Pin numbers for direct GPIO access in ISR
+static volatile int g_data_pin = -1;
+static volatile int g_clk_pin = -1;
+static volatile int g_cs_pin = -1;
+
 // Volatile variables accessed from ISR
 static volatile uint8_t g_cio_buffer[16];      // Buffer for CIO data
 static volatile uint8_t g_cio_bit_count = 0;   // Bit counter within byte
@@ -38,18 +44,11 @@ static volatile uint32_t g_clk_count = 0;      // CLK interrupt counter
 static volatile uint32_t g_bad_packets = 0;    // Bad packet counter
 
 // =============================================================================
-// INTERRUPT SERVICE ROUTINES FOR 6-WIRE
+// INTERRUPT SERVICE ROUTINES FOR 6-WIRE (Arduino native)
 // =============================================================================
 
-#ifdef ESP8266
-#define IRAM_ISR ICACHE_RAM_ATTR
-#else
-#define IRAM_ISR IRAM_ATTR
-#endif
-
 // CS (Chip Select) falling edge - start of packet
-void IRAM_ISR cio_cs_falling_isr(void *arg) {
-  (void)arg;  // Unused but required by ESPHome API
+void IRAM_ATTR cio_cs_falling_isr() {
   g_cs_count++;
   g_cio_bit_count = 0;
   g_cio_byte_count = 0;
@@ -62,8 +61,7 @@ void IRAM_ISR cio_cs_falling_isr(void *arg) {
 }
 
 // CS rising edge - end of packet
-void IRAM_ISR cio_cs_rising_isr(void *arg) {
-  (void)arg;  // Unused but required by ESPHome API
+void IRAM_ATTR cio_cs_rising_isr() {
   // Validate packet length (should be 11 bytes = 88 bits for TYPE1)
   if (g_cio_byte_count >= 11 || (g_cio_byte_count == 10 && g_cio_bit_count > 0)) {
     g_cio_packet_ready = true;
@@ -73,14 +71,13 @@ void IRAM_ISR cio_cs_rising_isr(void *arg) {
 }
 
 // CLK rising edge - sample data bit and output button bit
-void IRAM_ISR cio_clk_rising_isr(void *arg) {
-  (void)arg;  // Unused but required by ESPHome API
-  if (g_spa_instance == nullptr) return;
+void IRAM_ATTR cio_clk_rising_isr() {
+  if (g_data_pin < 0) return;
 
   g_clk_count++;
 
-  // Read bit from CIO (DATA line)
-  bool bit_value = g_spa_instance->read_data_pin_();
+  // Read bit from CIO (DATA line) - direct GPIO read
+  bool bit_value = digitalRead(g_data_pin);
 
   // Store bit in buffer (MSB first)
   if (g_cio_byte_count < 11) {
@@ -97,7 +94,8 @@ void IRAM_ISR cio_clk_rising_isr(void *arg) {
   if (g_dsp_bit_count < 16) {
     int bit_pos = 15 - g_dsp_bit_count;
     bool out_bit = (g_dsp_button_code >> bit_pos) & 0x01;
-    g_spa_instance->write_data_pin_(out_bit);
+    // Direct GPIO write for speed
+    digitalWrite(g_data_pin, out_bit);
     g_dsp_bit_count++;
   }
 }
@@ -134,41 +132,43 @@ void BestwaySpa::setup() {
       break;
   }
 
-  // Initialize 6-wire pins with interrupt-driven I/O
+  // Initialize 6-wire pins with interrupt-driven I/O using Arduino native functions
   if (protocol_type_ == PROTOCOL_6WIRE_T1 || protocol_type_ == PROTOCOL_6WIRE_T2) {
-    // CLK pin - INPUT, interrupt on rising edge
+    // Get pin numbers for direct GPIO access in ISR
     if (clk_pin_ != nullptr) {
-      clk_pin_->setup();
-      clk_pin_->pin_mode(gpio::FLAG_INPUT);
-      clk_pin_->attach_interrupt(cio_clk_rising_isr, this, gpio::INTERRUPT_RISING_EDGE);
-      ESP_LOGD(TAG, "CLK interrupt attached on GPIO%d", clk_pin_->get_pin());
+      g_clk_pin = clk_pin_->get_pin();
+      pinMode(g_clk_pin, INPUT);
+      attachInterrupt(digitalPinToInterrupt(g_clk_pin), cio_clk_rising_isr, RISING);
+      ESP_LOGD(TAG, "CLK interrupt attached on GPIO%d (Arduino native)", g_clk_pin);
     }
 
-    // DATA pin - starts as INPUT, will toggle for output
     if (data_pin_ != nullptr) {
-      data_pin_->setup();
-      data_pin_->pin_mode(gpio::FLAG_INPUT);
+      g_data_pin = data_pin_->get_pin();
+      pinMode(g_data_pin, INPUT);  // Start as input, toggle as needed
+      ESP_LOGD(TAG, "DATA pin configured on GPIO%d", g_data_pin);
     }
 
-    // CS pin - INPUT, interrupts on both edges
     if (cs_pin_ != nullptr) {
-      cs_pin_->setup();
-      cs_pin_->pin_mode(gpio::FLAG_INPUT);
-      // Note: ESPHome doesn't support CHANGE interrupt directly
-      // We'll use falling edge and detect rising in loop
-      cs_pin_->attach_interrupt(cio_cs_falling_isr, this, gpio::INTERRUPT_FALLING_EDGE);
-      ESP_LOGD(TAG, "CS interrupt attached on GPIO%d", cs_pin_->get_pin());
+      g_cs_pin = cs_pin_->get_pin();
+      pinMode(g_cs_pin, INPUT);
+      // Use CHANGE to detect both falling (start) and rising (end) edges
+      attachInterrupt(digitalPinToInterrupt(g_cs_pin), cio_cs_falling_isr, FALLING);
+      ESP_LOGD(TAG, "CS interrupt attached on GPIO%d (Arduino native)", g_cs_pin);
     }
 
     // Audio pin (optional) - OUTPUT
     if (audio_pin_ != nullptr) {
-      audio_pin_->setup();
-      audio_pin_->pin_mode(gpio::FLAG_OUTPUT);
-      audio_pin_->digital_write(false);
+      int audio_gpio = audio_pin_->get_pin();
+      pinMode(audio_gpio, OUTPUT);
+      digitalWrite(audio_gpio, LOW);
+      ESP_LOGD(TAG, "Audio pin configured on GPIO%d", audio_gpio);
     }
 
     // Initialize button code to NOBTN
     g_dsp_button_code = get_button_code_(NOBTN);
+
+    ESP_LOGI(TAG, "6-wire protocol initialized with Arduino native interrupts");
+    ESP_LOGI(TAG, "  CLK=%d, DATA=%d, CS=%d", g_clk_pin, g_data_pin, g_cs_pin);
   }
 
   // Initialize climate state
