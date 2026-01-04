@@ -532,9 +532,17 @@ void BestwaySpa::parse_6wire_cio_packet_(const uint8_t *packet) {
 
   // Always store temperature in Celsius internally
   // If spa is displaying Fahrenheit, convert to Celsius
-  if (!new_state.unit_celsius && new_state.current_temp > 50.0f) {
-    // Temperature looks like Fahrenheit (> 50), convert to Celsius
-    new_state.current_temp = (new_state.current_temp - 32.0f) * 5.0f / 9.0f;
+  if (!new_state.unit_celsius) {
+    // Spa is in Fahrenheit mode - convert to Celsius
+    // Valid spa temperatures in F are typically 68-104°F (20-40°C)
+    if (new_state.current_temp >= 60.0f && new_state.current_temp <= 110.0f) {
+      // Looks like a valid Fahrenheit reading, convert to Celsius
+      new_state.current_temp = (new_state.current_temp - 32.0f) * 5.0f / 9.0f;
+      ESP_LOGD(TAG, "Converted F to C: %.1f°C", new_state.current_temp);
+    } else if (new_state.current_temp >= 15.0f && new_state.current_temp <= 45.0f) {
+      // Already looks like Celsius despite F mode flag - leave as is
+      ESP_LOGD(TAG, "Temp %.0f looks like Celsius despite F mode, not converting", new_state.current_temp);
+    }
   }
 
   // Debounce: Check if new state matches pending state
