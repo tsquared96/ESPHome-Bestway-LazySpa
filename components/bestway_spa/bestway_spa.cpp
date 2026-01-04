@@ -505,33 +505,52 @@ void BestwaySpa::send_4wire_response_() {
 // =============================================================================
 
 void BestwaySpa::update_climate_state_() {
-  // Update current temperature
-  this->current_temperature = state_.current_temp;
-  this->target_temperature = state_.target_temp;
+  // Check if state has actually changed
+  bool state_changed = false;
 
-  // Determine mode based on state
-  if (!state_.power) {
-    this->mode = climate::CLIMATE_MODE_OFF;
-    this->action = climate::CLIMATE_ACTION_OFF;
-  } else if (state_.heater_enabled) {
-    this->mode = climate::CLIMATE_MODE_HEAT;
-
-    if (state_.heater_red) {
-      this->action = climate::CLIMATE_ACTION_HEATING;
-    } else if (state_.heater_green) {
-      this->action = climate::CLIMATE_ACTION_IDLE;
-    } else {
-      this->action = climate::CLIMATE_ACTION_IDLE;
-    }
-  } else if (state_.filter_pump) {
-    this->mode = climate::CLIMATE_MODE_FAN_ONLY;
-    this->action = climate::CLIMATE_ACTION_FAN;
-  } else {
-    this->mode = climate::CLIMATE_MODE_OFF;
-    this->action = climate::CLIMATE_ACTION_IDLE;
+  if (this->current_temperature != state_.current_temp) {
+    this->current_temperature = state_.current_temp;
+    state_changed = true;
   }
 
-  this->publish_state();
+  if (this->target_temperature != state_.target_temp) {
+    this->target_temperature = state_.target_temp;
+    state_changed = true;
+  }
+
+  // Determine mode based on state
+  climate::ClimateMode new_mode;
+  climate::ClimateAction new_action;
+
+  if (!state_.power) {
+    new_mode = climate::CLIMATE_MODE_OFF;
+    new_action = climate::CLIMATE_ACTION_OFF;
+  } else if (state_.heater_enabled) {
+    new_mode = climate::CLIMATE_MODE_HEAT;
+
+    if (state_.heater_red) {
+      new_action = climate::CLIMATE_ACTION_HEATING;
+    } else {
+      new_action = climate::CLIMATE_ACTION_IDLE;
+    }
+  } else if (state_.filter_pump) {
+    new_mode = climate::CLIMATE_MODE_FAN_ONLY;
+    new_action = climate::CLIMATE_ACTION_FAN;
+  } else {
+    new_mode = climate::CLIMATE_MODE_OFF;
+    new_action = climate::CLIMATE_ACTION_IDLE;
+  }
+
+  if (this->mode != new_mode || this->action != new_action) {
+    this->mode = new_mode;
+    this->action = new_action;
+    state_changed = true;
+  }
+
+  // Only publish if something changed
+  if (state_changed) {
+    this->publish_state();
+  }
 }
 
 void BestwaySpa::update_sensors_() {
