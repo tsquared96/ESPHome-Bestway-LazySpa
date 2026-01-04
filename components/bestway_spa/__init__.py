@@ -214,51 +214,7 @@ async def to_code(config):
 
 
 # =============================================================================
-# SWITCH PLATFORMS
+# SWITCH PLATFORMS - Modern ESPHome 2024+ approach
 # =============================================================================
-
-BESTWAY_SPA_SWITCH_SCHEMA = switch.switch_schema().extend({
-    cv.GenerateID(CONF_BESTWAY_SPA_ID): cv.use_id(BestwaySpa),
-})
-
-
-async def register_bestway_switch(var, config):
-    await switch.register_switch(var, config)
-    parent = await cg.get_variable(config[CONF_BESTWAY_SPA_ID])
-    cg.add(var.set_parent(parent))
-
-
-@cv.validate_registry("switch", "bestway_spa_heater")
-async def heater_switch_to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID], BestwaySpaHeaterSwitch())
-    await register_bestway_switch(var, config)
-
-
-@cv.validate_registry("switch", "bestway_spa_filter")
-async def filter_switch_to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID], BestwaySpaFilterSwitch())
-    await register_bestway_switch(var, config)
-
-
-@cv.validate_registry("switch", "bestway_spa_bubbles")
-async def bubbles_switch_to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID], BestwaySpaBubblesSwitch())
-    await register_bestway_switch(var, config)
-
-
-@cv.validate_registry("switch", "bestway_spa_jets")
-async def jets_switch_to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID], BestwaySpaJetsSwitch())
-    await register_bestway_switch(var, config)
-
-
-@cv.validate_registry("switch", "bestway_spa_lock")
-async def lock_switch_to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID], BestwaySpaLockSwitch())
-    await register_bestway_switch(var, config)
-
-
-@cv.validate_registry("switch", "bestway_spa_power")
-async def power_switch_to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID], BestwaySpaPowerSwitch())
-    await register_bestway_switch(var, config)
+# Note: Switches are now registered via switch/switch.py platform file
+# This file only contains the base component registration
