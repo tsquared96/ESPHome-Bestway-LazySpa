@@ -607,24 +607,21 @@ void BestwaySpa::parse_6wire_cio_packet_(const uint8_t *packet) {
 }
 
 // =============================================================================
-// DATA PIN HELPERS FOR ISR
+// DATA PIN HELPERS (for non-ISR contexts)
 // =============================================================================
 
 bool BestwaySpa::read_data_pin_() {
-  if (data_pin_ != nullptr) {
-    return data_pin_->digital_read();
+  // Read from CIO data pin (input from pump controller)
+  if (cio_data_pin_ != nullptr) {
+    return cio_data_pin_->digital_read();
   }
   return false;
 }
 
 void BestwaySpa::write_data_pin_(bool value) {
-  if (data_pin_ != nullptr) {
-    // Briefly switch to output, write, switch back to input
-    // This allows bidirectional communication on single wire
-    data_pin_->pin_mode(gpio::FLAG_OUTPUT);
-    data_pin_->digital_write(value);
-    // Note: We keep it in output mode during the transmission cycle
-    // The ISR will handle this during the clock pulses
+  // Write to DSP data pin (output to pump controller)
+  if (dsp_data_pin_ != nullptr) {
+    dsp_data_pin_->digital_write(value);
   }
 }
 
