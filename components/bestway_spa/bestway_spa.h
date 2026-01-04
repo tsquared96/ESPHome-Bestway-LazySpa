@@ -220,11 +220,19 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   void set_protocol_type(ProtocolType type) { protocol_type_ = type; }
   void set_model(SpaModel model) { model_ = model; }
 
-  // 6-wire pin configuration
-  void set_clk_pin(InternalGPIOPin *pin) { clk_pin_ = pin; }
-  void set_data_pin(InternalGPIOPin *pin) { data_pin_ = pin; }
-  void set_cs_pin(InternalGPIOPin *pin) { cs_pin_ = pin; }
+  // 6-wire pin configuration - MITM dual-bus architecture
+  // CIO bus pins (from pump controller to ESP - input)
+  void set_cio_data_pin(InternalGPIOPin *pin) { cio_data_pin_ = pin; }
+  void set_cio_clk_pin(InternalGPIOPin *pin) { cio_clk_pin_ = pin; }
+  void set_cio_cs_pin(InternalGPIOPin *pin) { cio_cs_pin_ = pin; }
+  // DSP bus pins (from ESP to pump controller - output)
+  void set_dsp_data_pin(InternalGPIOPin *pin) { dsp_data_pin_ = pin; }
   void set_audio_pin(InternalGPIOPin *pin) { audio_pin_ = pin; }
+
+  // Legacy single-bus setters (for backwards compatibility)
+  void set_clk_pin(InternalGPIOPin *pin) { cio_clk_pin_ = pin; }
+  void set_data_pin(InternalGPIOPin *pin) { cio_data_pin_ = pin; }
+  void set_cs_pin(InternalGPIOPin *pin) { cio_cs_pin_ = pin; }
 
   // Sensors
   void set_current_temperature_sensor(sensor::Sensor *sensor) { current_temp_sensor_ = sensor; }
@@ -301,10 +309,13 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   ProtocolType protocol_type_{PROTOCOL_4WIRE};
   SpaModel model_{MODEL_54154};
 
-  // GPIO pins for 6-wire
-  InternalGPIOPin *clk_pin_{nullptr};
-  InternalGPIOPin *data_pin_{nullptr};
-  InternalGPIOPin *cs_pin_{nullptr};
+  // GPIO pins for 6-wire MITM dual-bus architecture
+  // CIO bus (input from pump controller)
+  InternalGPIOPin *cio_clk_pin_{nullptr};
+  InternalGPIOPin *cio_data_pin_{nullptr};
+  InternalGPIOPin *cio_cs_pin_{nullptr};
+  // DSP bus (output to pump controller)
+  InternalGPIOPin *dsp_data_pin_{nullptr};
   InternalGPIOPin *audio_pin_{nullptr};
 
   // State

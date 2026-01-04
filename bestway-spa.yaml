@@ -104,12 +104,16 @@ climate:
     # model: "54154"
 
     # --- Option B: 6-Wire TYPE1 (Pre-2021 models) ---
+    # MITM dual-bus architecture - separate CIO input and DSP output buses
     protocol_type: 6WIRE
     model: PRE2021
-    clk_pin: GPIO14   # D5 - Clock
-    data_pin: GPIO12  # D6 - Data (bidirectional)
-    cs_pin: GPIO13    # D7 - Chip Select
-    audio_pin: GPIO15 # D8 - Audio/Buzzer (optional)
+    # CIO bus (input from pump controller)
+    cio_clk_pin: GPIO4    # D2 - Clock from CIO
+    cio_data_pin: GPIO5   # D1 - Data from CIO (input)
+    cio_cs_pin: GPIO14    # D5 - Chip Select from CIO
+    # DSP bus (output to pump controller)
+    dsp_data_pin: GPIO12  # D6 - Data to CIO (output for button codes)
+    audio_pin: GPIO13     # D7 - Audio/Buzzer (optional)
 
     # --- Option C: 6-Wire TYPE2 (54149E model) ---
     # protocol_type: 6WIRE_T2

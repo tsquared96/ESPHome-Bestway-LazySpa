@@ -27,10 +27,11 @@ static const uint32_t PACKET_TIMEOUT_MS = 100;
 // ISR needs access to the instance - we support only one spa per ESP
 static BestwaySpa *g_spa_instance = nullptr;
 
-// Pin numbers for direct GPIO access in ISR
-static volatile int g_data_pin = -1;
-static volatile int g_clk_pin = -1;
-static volatile int g_cs_pin = -1;
+// Pin numbers for direct GPIO access in ISR - MITM dual-bus
+static volatile int g_cio_data_pin = -1;  // INPUT: read display data from CIO
+static volatile int g_cio_clk_pin = -1;   // INPUT: clock from CIO
+static volatile int g_cio_cs_pin = -1;    // INPUT: chip select from CIO
+static volatile int g_dsp_data_pin = -1;  // OUTPUT: send button codes to CIO
 
 // Volatile variables accessed from ISR
 static volatile uint8_t g_cio_buffer[16];      // Buffer for CIO data
@@ -49,9 +50,9 @@ static volatile uint32_t g_bad_packets = 0;    // Bad packet counter
 
 // CS (Chip Select) change - handles both falling (start) and rising (end) edges
 void IRAM_ATTR cio_cs_change_isr() {
-  if (g_cs_pin < 0) return;
+  if (g_cio_cs_pin < 0) return;
 
-  bool cs_high = digitalRead(g_cs_pin);
+  bool cs_high = digitalRead(g_cio_cs_pin);
   g_cs_count++;
 
   if (!cs_high) {
@@ -75,18 +76,17 @@ void IRAM_ATTR cio_cs_change_isr() {
   }
 }
 
-// CLK rising edge - sample data bit from CIO
-// NOTE: Button transmission temporarily disabled to restore packet reading
+// CLK rising edge - MITM dual-bus handler
+// 1. Read bit from CIO_DATA (input from pump controller)
+// 2. Write button code bit to DSP_DATA (output to pump controller)
 void IRAM_ATTR cio_clk_rising_isr() {
-  if (g_data_pin < 0) return;
-
   g_clk_count++;
 
-  // Read bit from CIO (DATA line) - direct GPIO read
-  bool bit_value = digitalRead(g_data_pin);
+  // --- READ from CIO_DATA (input) ---
+  if (g_cio_data_pin >= 0 && g_cio_byte_count < 11) {
+    bool bit_value = digitalRead(g_cio_data_pin);
 
-  // Store bit in buffer (MSB first)
-  if (g_cio_byte_count < 11) {
+    // Store bit in buffer (MSB first)
     g_cio_buffer[g_cio_byte_count] = (g_cio_buffer[g_cio_byte_count] << 1) | (bit_value ? 1 : 0);
     g_cio_bit_count++;
 
@@ -96,9 +96,14 @@ void IRAM_ATTR cio_clk_rising_isr() {
     }
   }
 
-  // Button output disabled - the pinMode switching was disrupting the bus
-  // For proper button transmission, the VisualApproach MITM hardware
-  // likely uses separate data lines for CIO->DSP and DSP->CIO
+  // --- WRITE to DSP_DATA (output) ---
+  // Send 16-bit button code (MSB first) during the first 16 clock pulses
+  if (g_dsp_data_pin >= 0 && g_dsp_bit_count < 16) {
+    // Extract the bit to send (MSB first)
+    bool bit_to_send = (g_dsp_button_code >> (15 - g_dsp_bit_count)) & 1;
+    digitalWrite(g_dsp_data_pin, bit_to_send ? HIGH : LOW);
+  }
+
   g_dsp_bit_count++;
 }
 
@@ -135,27 +140,44 @@ void BestwaySpa::setup() {
   }
 
   // Initialize 6-wire pins with interrupt-driven I/O using Arduino native functions
+  // MITM dual-bus architecture: CIO bus (input) and DSP bus (output)
   if (protocol_type_ == PROTOCOL_6WIRE_T1 || protocol_type_ == PROTOCOL_6WIRE_T2) {
-    // Get pin numbers for direct GPIO access in ISR
-    if (clk_pin_ != nullptr) {
-      g_clk_pin = clk_pin_->get_pin();
-      pinMode(g_clk_pin, INPUT);
-      attachInterrupt(digitalPinToInterrupt(g_clk_pin), cio_clk_rising_isr, RISING);
-      ESP_LOGD(TAG, "CLK interrupt attached on GPIO%d (Arduino native)", g_clk_pin);
+    // --- CIO BUS PINS (input from pump controller) ---
+
+    // CIO Clock - INPUT with interrupt on rising edge
+    if (cio_clk_pin_ != nullptr) {
+      g_cio_clk_pin = cio_clk_pin_->get_pin();
+      pinMode(g_cio_clk_pin, INPUT);
+      attachInterrupt(digitalPinToInterrupt(g_cio_clk_pin), cio_clk_rising_isr, RISING);
+      ESP_LOGD(TAG, "CIO_CLK interrupt attached on GPIO%d", g_cio_clk_pin);
     }
 
-    if (data_pin_ != nullptr) {
-      g_data_pin = data_pin_->get_pin();
-      pinMode(g_data_pin, INPUT);  // Start as input, toggle as needed
-      ESP_LOGD(TAG, "DATA pin configured on GPIO%d", g_data_pin);
+    // CIO Data - INPUT (read display data from pump controller)
+    if (cio_data_pin_ != nullptr) {
+      g_cio_data_pin = cio_data_pin_->get_pin();
+      pinMode(g_cio_data_pin, INPUT);
+      ESP_LOGD(TAG, "CIO_DATA pin (input) configured on GPIO%d", g_cio_data_pin);
     }
 
-    if (cs_pin_ != nullptr) {
-      g_cs_pin = cs_pin_->get_pin();
-      pinMode(g_cs_pin, INPUT);
-      // Use CHANGE to detect both falling (start) and rising (end) edges
-      attachInterrupt(digitalPinToInterrupt(g_cs_pin), cio_cs_change_isr, CHANGE);
-      ESP_LOGD(TAG, "CS interrupt attached on GPIO%d with CHANGE mode", g_cs_pin);
+    // CIO Chip Select - INPUT with interrupt on both edges
+    if (cio_cs_pin_ != nullptr) {
+      g_cio_cs_pin = cio_cs_pin_->get_pin();
+      pinMode(g_cio_cs_pin, INPUT);
+      attachInterrupt(digitalPinToInterrupt(g_cio_cs_pin), cio_cs_change_isr, CHANGE);
+      ESP_LOGD(TAG, "CIO_CS interrupt attached on GPIO%d with CHANGE mode", g_cio_cs_pin);
+    }
+
+    // --- DSP BUS PINS (output to pump controller) ---
+
+    // DSP Data - OUTPUT (send button codes to pump controller)
+    if (dsp_data_pin_ != nullptr) {
+      g_dsp_data_pin = dsp_data_pin_->get_pin();
+      pinMode(g_dsp_data_pin, OUTPUT);
+      digitalWrite(g_dsp_data_pin, HIGH);  // Default high (NOBTN has high bits)
+      ESP_LOGD(TAG, "DSP_DATA pin (output) configured on GPIO%d", g_dsp_data_pin);
+    } else {
+      ESP_LOGW(TAG, "DSP_DATA pin not configured - button control will NOT work!");
+      ESP_LOGW(TAG, "Add 'dsp_data_pin' to your YAML config for button transmission");
     }
 
     // Audio pin (optional) - OUTPUT
@@ -169,8 +191,10 @@ void BestwaySpa::setup() {
     // Initialize button code to NOBTN
     g_dsp_button_code = get_button_code_(NOBTN);
 
-    ESP_LOGI(TAG, "6-wire protocol initialized with Arduino native interrupts");
-    ESP_LOGI(TAG, "  CLK=%d, DATA=%d, CS=%d", g_clk_pin, g_data_pin, g_cs_pin);
+    ESP_LOGI(TAG, "6-wire MITM dual-bus protocol initialized");
+    ESP_LOGI(TAG, "  CIO bus (input):  CLK=%d, DATA=%d, CS=%d",
+             g_cio_clk_pin, g_cio_data_pin, g_cio_cs_pin);
+    ESP_LOGI(TAG, "  DSP bus (output): DATA=%d", g_dsp_data_pin);
   }
 
   // Initialize climate state
@@ -304,12 +328,17 @@ void BestwaySpa::dump_config() {
   ESP_LOGCONFIG(TAG, "  Has Air: %s", has_air() ? "yes" : "no");
 
   if (protocol_type_ != PROTOCOL_4WIRE) {
-    if (clk_pin_ != nullptr)
-      ESP_LOGCONFIG(TAG, "  CIO CLK Pin: GPIO%d", clk_pin_->get_pin());
-    if (data_pin_ != nullptr)
-      ESP_LOGCONFIG(TAG, "  CIO DATA Pin: GPIO%d", data_pin_->get_pin());
-    if (cs_pin_ != nullptr)
-      ESP_LOGCONFIG(TAG, "  CIO CS Pin: GPIO%d", cs_pin_->get_pin());
+    ESP_LOGCONFIG(TAG, "  MITM Dual-Bus Architecture:");
+    if (cio_clk_pin_ != nullptr)
+      ESP_LOGCONFIG(TAG, "    CIO CLK Pin (input): GPIO%d", cio_clk_pin_->get_pin());
+    if (cio_data_pin_ != nullptr)
+      ESP_LOGCONFIG(TAG, "    CIO DATA Pin (input): GPIO%d", cio_data_pin_->get_pin());
+    if (cio_cs_pin_ != nullptr)
+      ESP_LOGCONFIG(TAG, "    CIO CS Pin (input): GPIO%d", cio_cs_pin_->get_pin());
+    if (dsp_data_pin_ != nullptr)
+      ESP_LOGCONFIG(TAG, "    DSP DATA Pin (output): GPIO%d", dsp_data_pin_->get_pin());
+    else
+      ESP_LOGCONFIG(TAG, "    DSP DATA Pin: NOT CONFIGURED (button control disabled!)");
     ESP_LOGCONFIG(TAG, "  CIO Good packets: %lu", (unsigned long)good_packets_);
     ESP_LOGCONFIG(TAG, "  CIO Bad packets: %lu", (unsigned long)g_bad_packets);
   }

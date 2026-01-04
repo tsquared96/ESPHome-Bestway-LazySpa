@@ -15,10 +15,18 @@ from . import (
     SPA_MODELS,
     CONF_PROTOCOL_TYPE,
     CONF_MODEL,
+    # CIO bus pins (input)
+    CONF_CIO_CLK_PIN,
+    CONF_CIO_DATA_PIN,
+    CONF_CIO_CS_PIN,
+    # DSP bus pins (output)
+    CONF_DSP_DATA_PIN,
+    CONF_AUDIO_PIN,
+    # Legacy pin names
     CONF_CLK_PIN,
     CONF_DATA_PIN,
     CONF_CS_PIN,
-    CONF_AUDIO_PIN,
+    # Sensor configs
     CONF_CURRENT_TEMPERATURE,
     CONF_TARGET_TEMPERATURE,
     CONF_HEATING,
@@ -40,12 +48,17 @@ def validate_6wire_pins(config):
     """Validate that 6-wire protocols have required pins configured."""
     protocol = config.get(CONF_PROTOCOL_TYPE, "4WIRE")
     if protocol in ["6WIRE", "6WIRE_T1", "6WIRE_T2", "6WIRE_TYPE1", "6WIRE_TYPE2"]:
-        if CONF_CLK_PIN not in config:
-            raise cv.Invalid("clk_pin is required for 6-wire protocols")
-        if CONF_DATA_PIN not in config:
-            raise cv.Invalid("data_pin is required for 6-wire protocols")
-        if CONF_CS_PIN not in config:
-            raise cv.Invalid("cs_pin is required for 6-wire protocols")
+        # Check for new dual-bus pins first, then fall back to legacy names
+        has_cio_clk = CONF_CIO_CLK_PIN in config or CONF_CLK_PIN in config
+        has_cio_data = CONF_CIO_DATA_PIN in config or CONF_DATA_PIN in config
+        has_cio_cs = CONF_CIO_CS_PIN in config or CONF_CS_PIN in config
+
+        if not has_cio_clk:
+            raise cv.Invalid("cio_clk_pin (or clk_pin) is required for 6-wire protocols")
+        if not has_cio_data:
+            raise cv.Invalid("cio_data_pin (or data_pin) is required for 6-wire protocols")
+        if not has_cio_cs:
+            raise cv.Invalid("cio_cs_pin (or cs_pin) is required for 6-wire protocols")
     return config
 
 
@@ -58,11 +71,18 @@ CONFIG_SCHEMA = cv.All(
         cv.Optional(CONF_PROTOCOL_TYPE, default="4WIRE"): cv.enum(PROTOCOL_TYPES, upper=True),
         cv.Optional(CONF_MODEL, default="54154"): cv.enum(SPA_MODELS, upper=True),
 
-        # 6-wire pin configuration
-        cv.Optional(CONF_CLK_PIN): pins.internal_gpio_input_pin_schema,
-        cv.Optional(CONF_DATA_PIN): pins.internal_gpio_output_pin_schema,
-        cv.Optional(CONF_CS_PIN): pins.internal_gpio_input_pin_schema,
+        # 6-wire MITM dual-bus pin configuration
+        # CIO bus pins (input from pump controller)
+        cv.Optional(CONF_CIO_CLK_PIN): pins.internal_gpio_input_pin_schema,
+        cv.Optional(CONF_CIO_DATA_PIN): pins.internal_gpio_input_pin_schema,
+        cv.Optional(CONF_CIO_CS_PIN): pins.internal_gpio_input_pin_schema,
+        # DSP bus pins (output to pump controller)
+        cv.Optional(CONF_DSP_DATA_PIN): pins.internal_gpio_output_pin_schema,
         cv.Optional(CONF_AUDIO_PIN): pins.internal_gpio_output_pin_schema,
+        # Legacy pin names (for backwards compatibility)
+        cv.Optional(CONF_CLK_PIN): pins.internal_gpio_input_pin_schema,
+        cv.Optional(CONF_DATA_PIN): pins.internal_gpio_input_pin_schema,
+        cv.Optional(CONF_CS_PIN): pins.internal_gpio_input_pin_schema,
 
         # Temperature sensors
         cv.Optional(CONF_CURRENT_TEMPERATURE): sensor.sensor_schema(
@@ -107,18 +127,33 @@ async def to_code(config):
     # Set model
     cg.add(var.set_model(config[CONF_MODEL]))
 
-    # Configure 6-wire pins
-    if CONF_CLK_PIN in config:
+    # Configure 6-wire MITM dual-bus pins
+    # CIO bus pins (input from pump controller)
+    if CONF_CIO_CLK_PIN in config:
+        pin = await cg.gpio_pin_expression(config[CONF_CIO_CLK_PIN])
+        cg.add(var.set_cio_clk_pin(pin))
+    elif CONF_CLK_PIN in config:  # Legacy fallback
         pin = await cg.gpio_pin_expression(config[CONF_CLK_PIN])
-        cg.add(var.set_clk_pin(pin))
+        cg.add(var.set_cio_clk_pin(pin))
 
-    if CONF_DATA_PIN in config:
+    if CONF_CIO_DATA_PIN in config:
+        pin = await cg.gpio_pin_expression(config[CONF_CIO_DATA_PIN])
+        cg.add(var.set_cio_data_pin(pin))
+    elif CONF_DATA_PIN in config:  # Legacy fallback
         pin = await cg.gpio_pin_expression(config[CONF_DATA_PIN])
-        cg.add(var.set_data_pin(pin))
+        cg.add(var.set_cio_data_pin(pin))
 
-    if CONF_CS_PIN in config:
+    if CONF_CIO_CS_PIN in config:
+        pin = await cg.gpio_pin_expression(config[CONF_CIO_CS_PIN])
+        cg.add(var.set_cio_cs_pin(pin))
+    elif CONF_CS_PIN in config:  # Legacy fallback
         pin = await cg.gpio_pin_expression(config[CONF_CS_PIN])
-        cg.add(var.set_cs_pin(pin))
+        cg.add(var.set_cio_cs_pin(pin))
+
+    # DSP bus pins (output to pump controller)
+    if CONF_DSP_DATA_PIN in config:
+        pin = await cg.gpio_pin_expression(config[CONF_DSP_DATA_PIN])
+        cg.add(var.set_dsp_data_pin(pin))
 
     if CONF_AUDIO_PIN in config:
         pin = await cg.gpio_pin_expression(config[CONF_AUDIO_PIN])
