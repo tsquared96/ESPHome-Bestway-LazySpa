@@ -75,14 +75,14 @@ void IRAM_ATTR cio_cs_change_isr() {
   }
 }
 
-// CLK rising edge - sample data bit and output button bit
+// CLK rising edge - sample data bit from CIO
+// NOTE: Button transmission temporarily disabled to restore packet reading
 void IRAM_ATTR cio_clk_rising_isr() {
   if (g_data_pin < 0) return;
 
   g_clk_count++;
 
   // Read bit from CIO (DATA line) - direct GPIO read
-  // Pin should be INPUT at this point
   bool bit_value = digitalRead(g_data_pin);
 
   // Store bit in buffer (MSB first)
@@ -96,20 +96,10 @@ void IRAM_ATTR cio_clk_rising_isr() {
     }
   }
 
-  // Output button code bit (MSB first, 16 bits)
-  // Switch to OUTPUT to drive the line, then back to INPUT
-  if (g_dsp_bit_count < 16) {
-    int bit_pos = 15 - g_dsp_bit_count;
-    bool out_bit = (g_dsp_button_code >> bit_pos) & 0x01;
-
-    // Switch to output, write bit, switch back to input
-    // This briefly drives the DATA line to transmit button code to CIO
-    pinMode(g_data_pin, OUTPUT);
-    digitalWrite(g_data_pin, out_bit);
-    pinMode(g_data_pin, INPUT);
-
-    g_dsp_bit_count++;
-  }
+  // Button output disabled - the pinMode switching was disrupting the bus
+  // For proper button transmission, the VisualApproach MITM hardware
+  // likely uses separate data lines for CIO->DSP and DSP->CIO
+  g_dsp_bit_count++;
 }
 
 // =============================================================================
