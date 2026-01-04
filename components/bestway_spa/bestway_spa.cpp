@@ -7,80 +7,10 @@ namespace bestway_spa {
 
 static const char *const TAG = "bestway_spa";
 
-// =============================================================================
-// TIMING CONSTANTS - Based on VisualApproach firmware
-// =============================================================================
-
+// Timing constants
 static const uint32_t PACKET_TIMEOUT_MS = 100;
-static const uint32_t STATE_UPDATE_INTERVAL_MS = 500;
+static const uint32_t STATE_UPDATE_INTERVAL_MS = 100;
 static const uint32_t SENSOR_UPDATE_INTERVAL_MS = 2000;
-static const uint32_t DSP_REFRESH_INTERVAL_MS = 50;      // ~20Hz display refresh
-static const uint32_t BUTTON_POLL_INTERVAL_MS = 100;
-static const uint32_t BUTTON_DEBOUNCE_MS = 50;
-static const uint32_t CLOCK_PULSE_US = 50;               // Clock pulse width
-
-// 6-wire TYPE1 protocol constants
-static const uint8_t DSP_CMD1_MODE6_11_7 = 0x01;
-static const uint8_t DSP_CMD1_MODE6_11_7_P05504 = 0x05;
-static const uint8_t DSP_CMD2_DATAREAD = 0x42;
-static const uint8_t DSP_CMD2_DATAWRITE = 0x40;
-static const uint8_t DSP_DIM_BASE = 0x80;
-static const uint8_t DSP_DIM_ON = 0x08;
-
-// 6-wire TYPE2 protocol constants
-static const uint8_t TYPE2_CMD1 = 0x40;
-static const uint8_t TYPE2_CMD2 = 0xC0;
-static const uint8_t TYPE2_CMD3 = 0x88;
-
-// Payload byte indices for TYPE1 (11-byte payload)
-static const uint8_t T1_DGT1_IDX = 1;
-static const uint8_t T1_DGT2_IDX = 3;
-static const uint8_t T1_DGT3_IDX = 5;
-static const uint8_t T1_TIMER_IDX = 7;
-static const uint8_t T1_TIMER_BIT = 1;
-static const uint8_t T1_LOCK_IDX = 7;
-static const uint8_t T1_LOCK_BIT = 2;
-static const uint8_t T1_HEATGRN_IDX = 9;
-static const uint8_t T1_HEATGRN_BIT = 0;
-static const uint8_t T1_HEATRED_IDX = 9;
-static const uint8_t T1_HEATRED_BIT = 3;
-static const uint8_t T1_AIR_IDX = 9;
-static const uint8_t T1_AIR_BIT = 1;
-static const uint8_t T1_FILTER_IDX = 9;
-static const uint8_t T1_FILTER_BIT = 2;
-static const uint8_t T1_C_IDX = 7;
-static const uint8_t T1_C_BIT = 0;
-static const uint8_t T1_F_IDX = 9;
-static const uint8_t T1_F_BIT = 4;
-static const uint8_t T1_POWER_IDX = 9;
-static const uint8_t T1_POWER_BIT = 5;
-static const uint8_t T1_JETS_IDX = 9;
-static const uint8_t T1_JETS_BIT = 6;
-
-// Payload byte indices for TYPE2 (5-byte payload)
-static const uint8_t T2_DGT1_IDX = 0;
-static const uint8_t T2_DGT2_IDX = 1;
-static const uint8_t T2_DGT3_IDX = 2;
-static const uint8_t T2_TIMER_IDX = 3;
-static const uint8_t T2_TIMER_BIT = 0;
-static const uint8_t T2_LOCK_IDX = 3;
-static const uint8_t T2_LOCK_BIT = 1;
-static const uint8_t T2_HEATGRN_IDX = 3;
-static const uint8_t T2_HEATGRN_BIT = 2;
-static const uint8_t T2_HEATRED_IDX = 3;
-static const uint8_t T2_HEATRED_BIT = 3;
-static const uint8_t T2_AIR_IDX = 3;
-static const uint8_t T2_AIR_BIT = 4;
-static const uint8_t T2_FILTER_IDX = 3;
-static const uint8_t T2_FILTER_BIT = 5;
-static const uint8_t T2_C_IDX = 3;
-static const uint8_t T2_C_BIT = 6;
-static const uint8_t T2_F_IDX = 3;
-static const uint8_t T2_F_BIT = 7;
-static const uint8_t T2_POWER_IDX = 4;
-static const uint8_t T2_POWER_BIT = 0;
-static const uint8_t T2_JETS_IDX = 4;
-static const uint8_t T2_JETS_BIT = 1;
 
 // =============================================================================
 // SETUP
@@ -111,49 +41,49 @@ void BestwaySpa::setup() {
       break;
   }
 
-  // Initialize 6-wire pins
-  if (protocol_type_ == PROTOCOL_6WIRE_T1 || protocol_type_ == PROTOCOL_6WIRE_T2) {
-    if (clk_pin_ != nullptr) {
-      clk_pin_->setup();
-      clk_pin_->digital_write(false);  // Clock idle low
-    }
-    if (data_pin_ != nullptr) {
-      data_pin_->setup();
-      data_pin_->pin_mode(gpio::FLAG_OUTPUT);
-      data_pin_->digital_write(true);  // Data idle high
-    }
-    if (cs_pin_ != nullptr) {
-      cs_pin_->setup();
-      cs_pin_->digital_write(true);    // CS idle high
-    }
-    if (audio_pin_ != nullptr) {
-      audio_pin_->setup();
-      audio_pin_->digital_write(false);
+  // Initialize 6-wire TYPE1 protocol
+  if (protocol_type_ == PROTOCOL_6WIRE_T1) {
+    // Get pin numbers
+    int cio_data = cio_data_pin_ ? cio_data_pin_->get_pin() : -1;
+    int cio_clk = cio_clk_pin_ ? cio_clk_pin_->get_pin() : -1;
+    int cio_cs = cio_cs_pin_ ? cio_cs_pin_->get_pin() : -1;
+
+    // DSP pins - use same as CIO if not specified (man-in-the-middle setup)
+    int dsp_data = dsp_data_pin_ ? dsp_data_pin_->get_pin() : cio_data;
+    int dsp_clk = dsp_clk_pin_ ? dsp_clk_pin_->get_pin() : cio_clk;
+    int dsp_cs = dsp_cs_pin_ ? dsp_cs_pin_->get_pin() : cio_cs;
+    int audio = audio_pin_ ? audio_pin_->get_pin() : -1;
+
+    if (cio_data < 0 || cio_clk < 0 || cio_cs < 0) {
+      ESP_LOGE(TAG, "6-wire TYPE1 requires data, clk, and cs pins!");
+      return;
     }
 
-    // Initialize default DSP payload
-    if (protocol_type_ == PROTOCOL_6WIRE_T1) {
-      dsp_payload_len_ = 11;
-      dsp_payload_[0] = (model_ == MODEL_P05504) ? DSP_CMD1_MODE6_11_7_P05504 : DSP_CMD1_MODE6_11_7;
-      dsp_payload_[1] = 0x00;  // Digit 1
-      dsp_payload_[2] = 0x00;
-      dsp_payload_[3] = 0x00;  // Digit 2
-      dsp_payload_[4] = 0x00;
-      dsp_payload_[5] = 0x00;  // Digit 3
-      dsp_payload_[6] = 0x00;
-      dsp_payload_[7] = 0x00;  // Status byte 1
-      dsp_payload_[8] = 0x00;
-      dsp_payload_[9] = 0x00;  // Status byte 2
-      dsp_payload_[10] = 0x00;
+    // Set button codes based on model
+    if (model_ == MODEL_P05504) {
+      cio_type1_.set_button_codes(BTN_CODES_P05504, BTN_COUNT);
     } else {
-      dsp_payload_len_ = 5;
+      cio_type1_.set_button_codes(BTN_CODES_PRE2021, BTN_COUNT);
     }
+
+    // Set model features
+    cio_type1_.set_has_jets(has_jets());
+    cio_type1_.set_has_air(has_air());
+
+    // Initialize CIO handler (interrupt-driven, receives FROM CIO board)
+    cio_type1_.setup(cio_data, cio_clk, cio_cs);
+
+    // Initialize DSP handler (bit-banging, sends TO DSP board)
+    dsp_type1_.setup(dsp_data, dsp_clk, dsp_cs, audio);
+
+    ESP_LOGI(TAG, "6-wire TYPE1 initialized - CIO: data=%d clk=%d cs=%d, DSP: data=%d clk=%d cs=%d audio=%d",
+             cio_data, cio_clk, cio_cs, dsp_data, dsp_clk, dsp_cs, audio);
   }
 
   // Initialize climate state - default to power ON and heating enabled
   state_.power = true;
   state_.heater_enabled = true;
-  state_.filter_pump = true;  // Filter must run for heater to work
+  state_.filter_pump = true;
 
   this->mode = climate::CLIMATE_MODE_HEAT;
   this->action = climate::CLIMATE_ACTION_IDLE;
@@ -185,10 +115,6 @@ void BestwaySpa::setup() {
 void BestwaySpa::loop() {
   const uint32_t now = millis();
 
-  if (paused_) {
-    return;
-  }
-
   // Handle protocol based on type
   switch (protocol_type_) {
     case PROTOCOL_4WIRE:
@@ -201,14 +127,6 @@ void BestwaySpa::loop() {
       handle_6wire_type2_protocol_();
       break;
   }
-
-  // Process button queue (for 6-wire)
-  if (protocol_type_ != PROTOCOL_4WIRE) {
-    process_button_queue_();
-  }
-
-  // Handle toggle requests
-  handle_toggles_();
 
   // Update climate state periodically
   if (now - last_state_update_ > STATE_UPDATE_INTERVAL_MS) {
@@ -236,7 +154,7 @@ void BestwaySpa::dump_config() {
       proto_str = "4-wire UART";
       break;
     case PROTOCOL_6WIRE_T1:
-      proto_str = "6-wire TYPE1 (SPI-like)";
+      proto_str = "6-wire TYPE1 (SPI-like, interrupt-driven)";
       break;
     case PROTOCOL_6WIRE_T2:
       proto_str = "6-wire TYPE2 (SPI-like)";
@@ -279,13 +197,15 @@ void BestwaySpa::dump_config() {
   ESP_LOGCONFIG(TAG, "  Has Jets: %s", has_jets() ? "yes" : "no");
   ESP_LOGCONFIG(TAG, "  Has Air: %s", has_air() ? "yes" : "no");
 
-  if (protocol_type_ != PROTOCOL_4WIRE) {
-    if (clk_pin_ != nullptr)
-      ESP_LOGCONFIG(TAG, "  CLK Pin: GPIO%d", clk_pin_->get_pin());
-    if (data_pin_ != nullptr)
-      ESP_LOGCONFIG(TAG, "  DATA Pin: GPIO%d", data_pin_->get_pin());
-    if (cs_pin_ != nullptr)
-      ESP_LOGCONFIG(TAG, "  CS Pin: GPIO%d", cs_pin_->get_pin());
+  if (protocol_type_ == PROTOCOL_6WIRE_T1) {
+    if (cio_clk_pin_ != nullptr)
+      ESP_LOGCONFIG(TAG, "  CIO CLK Pin: GPIO%d", cio_clk_pin_->get_pin());
+    if (cio_data_pin_ != nullptr)
+      ESP_LOGCONFIG(TAG, "  CIO DATA Pin: GPIO%d", cio_data_pin_->get_pin());
+    if (cio_cs_pin_ != nullptr)
+      ESP_LOGCONFIG(TAG, "  CIO CS Pin: GPIO%d", cio_cs_pin_->get_pin());
+    ESP_LOGCONFIG(TAG, "  CIO Good packets: %u", cio_type1_.get_good_packets());
+    ESP_LOGCONFIG(TAG, "  CIO Bad packets: %u", cio_type1_.get_bad_packets());
   }
 
   LOG_CLIMATE("", "Bestway Spa Climate", this);
@@ -355,6 +275,112 @@ void BestwaySpa::control(const climate::ClimateCall &call) {
 }
 
 // =============================================================================
+// 6-WIRE TYPE1 PROTOCOL HANDLER (Interrupt-based)
+// =============================================================================
+
+void BestwaySpa::handle_6wire_type1_protocol_() {
+  // Update CIO states from interrupt-received data
+  cio_type1_.update_states();
+
+  // Check if we have new data from CIO
+  if (cio_type1_.is_new_packet_available()) {
+    // Sync CIO state to our state and DSP
+    sync_cio_to_dsp_();
+  }
+
+  // Get button presses from DSP and handle them
+  Buttons button = dsp_type1_.get_pressed_button();
+  if (button != NOBTN) {
+    handle_button_press_(button);
+  }
+
+  // Handle pending button from ESPHome controls
+  if (pending_button_ != NOBTN) {
+    // Set the button code in CIO handler to simulate button press
+    cio_type1_.set_button_code(cio_type1_.get_button_code(pending_button_));
+    pending_button_ = NOBTN;
+  }
+
+  // Handle temperature adjustment steps
+  if (temp_adjust_steps_ != 0) {
+    Buttons btn = temp_adjust_steps_ > 0 ? UP : DOWN;
+    cio_type1_.set_button_code(cio_type1_.get_button_code(btn));
+    if (temp_adjust_steps_ > 0) {
+      temp_adjust_steps_--;
+    } else {
+      temp_adjust_steps_++;
+    }
+  }
+
+  // Update DSP display with current states
+  dsp_type1_.handle_states();
+}
+
+void BestwaySpa::sync_cio_to_dsp_() {
+  // Get CIO states
+  CIOStates &cio = cio_type1_.get_states();
+  DSPStates &dsp = dsp_type1_.get_states();
+
+  // Copy state from CIO to DSP
+  dsp.locked = cio.locked;
+  dsp.power = cio.power;
+  dsp.unit = cio.unit;
+  dsp.bubbles = cio.bubbles;
+  dsp.heatgrn = cio.heatgrn;
+  dsp.heatred = cio.heatred;
+  dsp.pump = cio.pump;
+  dsp.jets = cio.jets;
+  dsp.timerled1 = cio.timerled1;
+  dsp.timerled2 = cio.timerled2;
+  dsp.timerbuttonled = cio.timerbuttonled;
+  dsp.char1 = cio.char1;
+  dsp.char2 = cio.char2;
+  dsp.char3 = cio.char3;
+
+  // Update our internal state
+  state_.locked = cio.locked;
+  state_.power = cio.power;
+  state_.unit_celsius = cio.unit;
+  state_.bubbles = cio.bubbles;
+  state_.heater_green = cio.heatgrn;
+  state_.heater_red = cio.heatred;
+  state_.heater_enabled = cio.heat;
+  state_.filter_pump = cio.pump;
+  state_.jets = cio.jets;
+  state_.current_temp = (float)cio.temperature;
+  state_.target_temp = (float)cio.target;
+  state_.error_code = cio.error;
+
+  // Update display chars
+  state_.display_chars[0] = cio.char1;
+  state_.display_chars[1] = cio.char2;
+  state_.display_chars[2] = cio.char3;
+  state_.display_chars[3] = '\0';
+
+  // Handle power on pending request
+  if (power_on_pending_ && !state_.power) {
+    pending_button_ = POWER;
+    power_on_pending_ = false;
+  }
+}
+
+void BestwaySpa::handle_button_press_(Buttons button) {
+  ESP_LOGD(TAG, "Button pressed: %d", button);
+
+  // Forward the button press to CIO
+  cio_type1_.set_button_code(cio_type1_.get_button_code(button));
+}
+
+// =============================================================================
+// 6-WIRE TYPE2 PROTOCOL HANDLER (placeholder)
+// =============================================================================
+
+void BestwaySpa::handle_6wire_type2_protocol_() {
+  // TYPE2 implementation placeholder
+  ESP_LOGW(TAG, "6-wire TYPE2 protocol not yet implemented with interrupts");
+}
+
+// =============================================================================
 // 4-WIRE UART PROTOCOL HANDLER
 // =============================================================================
 
@@ -375,7 +401,6 @@ void BestwaySpa::handle_4wire_protocol_() {
       uint8_t calc_sum = rx_buffer_[1] + rx_buffer_[2] + rx_buffer_[3] + rx_buffer_[4];
       if (calc_sum == rx_buffer_[5]) {
         parse_4wire_packet_(rx_buffer_);
-        new_packet_available_ = true;
       } else {
         ESP_LOGW(TAG, "4-wire checksum mismatch: calc=%02X, recv=%02X", calc_sum, rx_buffer_[5]);
       }
@@ -392,11 +417,8 @@ void BestwaySpa::handle_4wire_protocol_() {
     rx_buffer_.clear();
   }
 
-  // Send response if we have pending commands
-  if (new_packet_available_) {
-    send_4wire_response_();
-    new_packet_available_ = false;
-  }
+  // Send response
+  send_4wire_response_();
 }
 
 void BestwaySpa::parse_4wire_packet_(const std::vector<uint8_t> &packet) {
@@ -425,7 +447,6 @@ void BestwaySpa::parse_4wire_packet_(const std::vector<uint8_t> &packet) {
   bool heat2 = (command & model_config_->heat_bitmask2) != 0;
   state_.heater_red = heat1 || heat2;
   state_.heater_green = state_.heater_enabled && !state_.heater_red;
-  state_.heater_enabled = state_.heater_red || state_.heater_green;
 
   ESP_LOGV(TAG, "4-wire: cmd=%02X temp=%d err=%d pump=%d bubbles=%d heat=%d",
            command, temp_raw, error, state_.filter_pump, state_.bubbles, state_.heater_red);
@@ -484,360 +505,8 @@ void BestwaySpa::send_4wire_response_() {
 }
 
 // =============================================================================
-// 6-WIRE TYPE1 PROTOCOL HANDLER
-// =============================================================================
-
-void BestwaySpa::handle_6wire_type1_protocol_() {
-  uint32_t now = millis();
-
-  // Refresh DSP display at regular intervals
-  if (now - last_dsp_refresh_ >= DSP_REFRESH_INTERVAL_MS) {
-    send_dsp_payload_type1_();
-    last_dsp_refresh_ = now;
-  }
-
-  // Poll for button presses at regular intervals
-  if (now - last_button_poll_ >= BUTTON_POLL_INTERVAL_MS) {
-    receive_cio_payload_type1_();
-    update_states_from_payload_();
-    last_button_poll_ = now;
-  }
-}
-
-void BestwaySpa::send_dsp_payload_type1_() {
-  if (cs_pin_ == nullptr || clk_pin_ == nullptr || data_pin_ == nullptr) {
-    ESP_LOGW(TAG, "6-wire pins not configured");
-    return;
-  }
-
-  // Set data pin to output mode
-  data_pin_->pin_mode(gpio::FLAG_OUTPUT);
-
-  // Start transmission - CS low
-  cs_pin_->digital_write(false);
-  delayMicroseconds(10);
-
-  // Send 11-byte payload
-  for (size_t i = 0; i < 11; i++) {
-    send_bits_to_dsp_(dsp_payload_[i], 8);
-  }
-
-  // End transmission - CS high
-  cs_pin_->digital_write(true);
-}
-
-void BestwaySpa::receive_cio_payload_type1_() {
-  if (cs_pin_ == nullptr || clk_pin_ == nullptr || data_pin_ == nullptr) {
-    return;
-  }
-
-  // Send command to request button state
-  data_pin_->pin_mode(gpio::FLAG_OUTPUT);
-
-  cs_pin_->digital_write(false);
-  delayMicroseconds(10);
-
-  // Send data read command
-  uint8_t cmd1 = (model_ == MODEL_P05504) ? DSP_CMD1_MODE6_11_7_P05504 : DSP_CMD1_MODE6_11_7;
-  send_bits_to_dsp_(cmd1, 8);
-  send_bits_to_dsp_(DSP_CMD2_DATAREAD, 8);
-
-  // Switch to input mode
-  data_pin_->pin_mode(gpio::FLAG_INPUT);
-  delayMicroseconds(10);
-
-  // Read 16-bit button code
-  uint16_t button_code = receive_bits_from_dsp_(16);
-
-  // End transmission
-  cs_pin_->digital_write(true);
-
-  // Store button code if valid
-  if (button_code != 0xFFFF) {
-    current_button_code_ = button_code;
-    ESP_LOGV(TAG, "6-wire TYPE1 button code: 0x%04X", button_code);
-  }
-}
-
-// =============================================================================
-// 6-WIRE TYPE2 PROTOCOL HANDLER
-// =============================================================================
-
-void BestwaySpa::handle_6wire_type2_protocol_() {
-  uint32_t now = millis();
-
-  // Refresh DSP display at regular intervals
-  if (now - last_dsp_refresh_ >= DSP_REFRESH_INTERVAL_MS) {
-    send_dsp_payload_type2_();
-    last_dsp_refresh_ = now;
-  }
-
-  // Poll for button presses at regular intervals
-  if (now - last_button_poll_ >= BUTTON_POLL_INTERVAL_MS) {
-    receive_cio_payload_type2_();
-    update_states_from_payload_();
-    last_button_poll_ = now;
-  }
-}
-
-void BestwaySpa::send_dsp_payload_type2_() {
-  if (cs_pin_ == nullptr || clk_pin_ == nullptr || data_pin_ == nullptr) {
-    ESP_LOGW(TAG, "6-wire pins not configured");
-    return;
-  }
-
-  // Set data pin to output mode
-  data_pin_->pin_mode(gpio::FLAG_OUTPUT);
-
-  // Start transmission - CS low
-  cs_pin_->digital_write(false);
-  delayMicroseconds(10);
-
-  // Send command byte 1
-  send_bits_to_dsp_(TYPE2_CMD1, 8);
-
-  // Send 5-byte payload (LSB first for TYPE2)
-  for (size_t i = 0; i < 5; i++) {
-    // TYPE2 sends LSB first
-    uint8_t byte = dsp_payload_[i];
-    for (int bit = 0; bit < 8; bit++) {
-      data_pin_->digital_write((byte >> bit) & 0x01);
-      pulse_clock_();
-    }
-  }
-
-  // End transmission - CS high
-  cs_pin_->digital_write(true);
-  delayMicroseconds(10);
-
-  // Send brightness command
-  cs_pin_->digital_write(false);
-  send_bits_to_dsp_(TYPE2_CMD3 | (state_.brightness & 0x07), 8);
-  cs_pin_->digital_write(true);
-}
-
-void BestwaySpa::receive_cio_payload_type2_() {
-  if (cs_pin_ == nullptr || clk_pin_ == nullptr || data_pin_ == nullptr) {
-    return;
-  }
-
-  // Send command to request button state
-  data_pin_->pin_mode(gpio::FLAG_OUTPUT);
-
-  cs_pin_->digital_write(false);
-  delayMicroseconds(10);
-
-  // Send data read command
-  send_bits_to_dsp_(TYPE2_CMD2, 8);
-
-  // Switch to input mode
-  data_pin_->pin_mode(gpio::FLAG_INPUT);
-  delayMicroseconds(10);
-
-  // Read 16-bit button code (LSB first for TYPE2)
-  uint16_t button_code = 0;
-  for (int bit = 0; bit < 16; bit++) {
-    pulse_clock_();
-    if (data_pin_->digital_read()) {
-      button_code |= (1 << bit);
-    }
-  }
-
-  // End transmission
-  cs_pin_->digital_write(true);
-
-  // Store button code if valid
-  if (button_code != 0x0000) {
-    current_button_code_ = button_code;
-    ESP_LOGV(TAG, "6-wire TYPE2 button code: 0x%04X", button_code);
-  }
-}
-
-// =============================================================================
-// 6-WIRE BIT-BANGING HELPERS
-// =============================================================================
-
-void BestwaySpa::send_bits_to_dsp_(uint32_t data, uint8_t bits) {
-  // Send MSB first (TYPE1 style)
-  for (int i = bits - 1; i >= 0; i--) {
-    data_pin_->digital_write((data >> i) & 0x01);
-    pulse_clock_();
-  }
-}
-
-uint16_t BestwaySpa::receive_bits_from_dsp_(uint8_t bits) {
-  uint16_t result = 0;
-
-  // Read MSB first (TYPE1 style)
-  for (int i = bits - 1; i >= 0; i--) {
-    pulse_clock_();
-    if (data_pin_->digital_read()) {
-      result |= (1 << i);
-    }
-  }
-
-  return result;
-}
-
-void BestwaySpa::pulse_clock_(uint32_t duration_us) {
-  clk_pin_->digital_write(true);
-  delayMicroseconds(duration_us);
-  clk_pin_->digital_write(false);
-  delayMicroseconds(duration_us);
-}
-
-// =============================================================================
 // STATE MANAGEMENT
 // =============================================================================
-
-void BestwaySpa::update_states_from_payload_() {
-  // Decode button press from current_button_code_
-  const uint16_t *btn_codes;
-  switch (model_) {
-    case MODEL_PRE2021:
-      btn_codes = BTN_CODES_PRE2021;
-      break;
-    case MODEL_P05504:
-      btn_codes = BTN_CODES_P05504;
-      break;
-    case MODEL_54149E:
-      btn_codes = BTN_CODES_54149E;
-      break;
-    default:
-      btn_codes = BTN_CODES_PRE2021;
-      break;
-  }
-
-  // Find which button was pressed
-  for (uint8_t i = 0; i < BTN_COUNT; i++) {
-    if (current_button_code_ == btn_codes[i] && i != NOBTN) {
-      ESP_LOGD(TAG, "Button pressed: %d", i);
-      switch (i) {
-        case LOCK:
-          state_.locked = !state_.locked;
-          break;
-        case POWER:
-          state_.power = !state_.power;
-          break;
-        case HEAT:
-          if (!state_.locked && state_.power) {
-            state_.heater_enabled = !state_.heater_enabled;
-          }
-          break;
-        case PUMP:
-          if (!state_.locked && state_.power) {
-            state_.filter_pump = !state_.filter_pump;
-          }
-          break;
-        case BUBBLES:
-          if (!state_.locked && state_.power) {
-            state_.bubbles = !state_.bubbles;
-          }
-          break;
-        case HYDROJETS:
-          if (!state_.locked && state_.power && has_jets()) {
-            state_.jets = !state_.jets;
-          }
-          break;
-        case UP:
-          if (!state_.locked && state_.power) {
-            state_.target_temp += 1.0f;
-            if (state_.unit_celsius && state_.target_temp > 40.0f)
-              state_.target_temp = 40.0f;
-            if (!state_.unit_celsius && state_.target_temp > 104.0f)
-              state_.target_temp = 104.0f;
-          }
-          break;
-        case DOWN:
-          if (!state_.locked && state_.power) {
-            state_.target_temp -= 1.0f;
-            if (state_.unit_celsius && state_.target_temp < 20.0f)
-              state_.target_temp = 20.0f;
-            if (!state_.unit_celsius && state_.target_temp < 68.0f)
-              state_.target_temp = 68.0f;
-          }
-          break;
-        case UNIT:
-          if (!state_.locked && state_.power) {
-            state_.unit_celsius = !state_.unit_celsius;
-            // Convert temperatures
-            if (state_.unit_celsius) {
-              state_.current_temp = fahrenheit_to_celsius_(state_.current_temp);
-              state_.target_temp = fahrenheit_to_celsius_(state_.target_temp);
-            } else {
-              state_.current_temp = celsius_to_fahrenheit_(state_.current_temp);
-              state_.target_temp = celsius_to_fahrenheit_(state_.target_temp);
-            }
-          }
-          break;
-        case TIMER:
-          if (!state_.locked && state_.power) {
-            state_.timer_active = !state_.timer_active;
-          }
-          break;
-      }
-      break;
-    }
-  }
-
-  // Reset button code
-  current_button_code_ = btn_codes[NOBTN];
-}
-
-void BestwaySpa::handle_toggles_() {
-  // Process toggle requests from Home Assistant / automation
-
-  if (toggles_.power_pressed) {
-    queue_button_(POWER, 300);
-    toggles_.power_pressed = false;
-  }
-
-  if (toggles_.lock_pressed) {
-    queue_button_(LOCK, 300);
-    toggles_.lock_pressed = false;
-  }
-
-  if (toggles_.heat_pressed) {
-    queue_button_(HEAT, 300);
-    toggles_.heat_pressed = false;
-  }
-
-  if (toggles_.pump_pressed) {
-    queue_button_(PUMP, 300);
-    toggles_.pump_pressed = false;
-  }
-
-  if (toggles_.bubbles_pressed) {
-    queue_button_(BUBBLES, 300);
-    toggles_.bubbles_pressed = false;
-  }
-
-  if (toggles_.jets_pressed && has_jets()) {
-    queue_button_(HYDROJETS, 300);
-    toggles_.jets_pressed = false;
-  }
-
-  if (toggles_.unit_pressed) {
-    queue_button_(UNIT, 300);
-    toggles_.unit_pressed = false;
-  }
-
-  if (toggles_.timer_pressed) {
-    queue_button_(TIMER, 300);
-    toggles_.timer_pressed = false;
-  }
-
-  // Handle temperature adjustment
-  if (toggles_.set_target_temp && toggles_.target_temp_delta != 0) {
-    Buttons btn = toggles_.target_temp_delta > 0 ? UP : DOWN;
-    int steps = abs(toggles_.target_temp_delta);
-    for (int i = 0; i < steps; i++) {
-      queue_button_(btn, 300);
-    }
-    toggles_.target_temp_delta = 0;
-    toggles_.set_target_temp = false;
-  }
-}
 
 void BestwaySpa::update_climate_state_() {
   // Update current temperature
@@ -922,137 +591,61 @@ void BestwaySpa::update_sensors_() {
 }
 
 // =============================================================================
-// BUTTON QUEUE FOR 6-WIRE
-// =============================================================================
-
-void BestwaySpa::queue_button_(Buttons button, int duration_ms) {
-  if (!button_enabled_[button]) {
-    ESP_LOGD(TAG, "Button %d is disabled", button);
-    return;
-  }
-
-  ButtonQueueItem item;
-  item.button_code = get_button_code_(button);
-  item.duration_ms = duration_ms;
-  item.start_time = 0;  // Will be set when processing starts
-  item.target_state = 0xFF;  // Don't wait for state change
-  item.target_value = 0;
-
-  button_queue_.push_back(item);
-  ESP_LOGD(TAG, "Queued button %d (code 0x%04X) for %dms", button, item.button_code, duration_ms);
-}
-
-void BestwaySpa::process_button_queue_() {
-  if (button_queue_.empty()) {
-    current_button_code_ = get_button_code_(NOBTN);
-    return;
-  }
-
-  uint32_t now = millis();
-  auto &item = button_queue_.front();
-
-  if (item.start_time == 0) {
-    // Start pressing this button
-    item.start_time = now;
-    current_button_code_ = item.button_code;
-    ESP_LOGV(TAG, "Started pressing button 0x%04X", item.button_code);
-  }
-
-  // Check if button press duration has elapsed
-  if ((now - item.start_time) >= (uint32_t)item.duration_ms) {
-    ESP_LOGV(TAG, "Finished pressing button 0x%04X", item.button_code);
-    button_queue_.erase(button_queue_.begin());
-  }
-}
-
-uint16_t BestwaySpa::get_button_code_(Buttons button) {
-  if (button >= BTN_COUNT) {
-    return 0x1B1B;
-  }
-
-  switch (model_) {
-    case MODEL_PRE2021:
-      return BTN_CODES_PRE2021[button];
-    case MODEL_P05504:
-      return BTN_CODES_P05504[button];
-    case MODEL_54149E:
-      return BTN_CODES_54149E[button];
-    default:
-      return BTN_CODES_PRE2021[button];
-  }
-}
-
-// =============================================================================
-// CHARACTER DECODING
-// =============================================================================
-
-char BestwaySpa::decode_7segment_(uint8_t segments, bool is_type1) {
-  const uint8_t *codes = is_type1 ? CHARCODES_TYPE1 : CHARCODES_TYPE2;
-  size_t code_count = sizeof(CHARCODES_TYPE1) / sizeof(CHARCODES_TYPE1[0]);
-
-  for (size_t i = 0; i < code_count; i++) {
-    if (codes[i] == segments) {
-      return CHARS[i];
-    }
-  }
-  return '?';  // Unknown segment pattern
-}
-
-// =============================================================================
 // CONTROL METHODS
 // =============================================================================
 
 void BestwaySpa::set_power(bool state) {
-  if (state_.power != state) {
-    if (protocol_type_ == PROTOCOL_4WIRE) {
-      // 4-wire doesn't have power button - toggle via heater/pump
-      state_.power = state;
-    } else {
-      toggles_.power_pressed = true;
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    state_.power = state;
+  } else {
+    if (state && !state_.power) {
+      // Turn on - queue power button
+      pending_button_ = POWER;
+    } else if (!state && state_.power) {
+      // Turn off - queue power button
+      pending_button_ = POWER;
     }
-    ESP_LOGD(TAG, "Requested power %s", state ? "ON" : "OFF");
   }
+  ESP_LOGD(TAG, "Requested power %s", state ? "ON" : "OFF");
 }
 
 void BestwaySpa::set_heater(bool state) {
-  if (state_.heater_enabled != state) {
-    if (protocol_type_ == PROTOCOL_4WIRE) {
-      state_.heater_enabled = state;
-      // For 4-wire, filter must be on for heater
-      if (state && !state_.filter_pump) {
-        state_.filter_pump = true;
-      }
-    } else {
-      toggles_.heat_pressed = true;
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    state_.heater_enabled = state;
+    if (state && !state_.filter_pump) {
+      state_.filter_pump = true;
     }
-    ESP_LOGD(TAG, "Requested heater %s", state ? "ON" : "OFF");
+  } else {
+    if (state != state_.heater_enabled) {
+      pending_button_ = HEAT;
+    }
   }
+  ESP_LOGD(TAG, "Requested heater %s", state ? "ON" : "OFF");
 }
 
 void BestwaySpa::set_filter(bool state) {
-  if (state_.filter_pump != state) {
-    if (protocol_type_ == PROTOCOL_4WIRE) {
-      state_.filter_pump = state;
-      // For 4-wire, turning off filter turns off heater
-      if (!state && state_.heater_enabled) {
-        state_.heater_enabled = false;
-      }
-    } else {
-      toggles_.pump_pressed = true;
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    state_.filter_pump = state;
+    if (!state && state_.heater_enabled) {
+      state_.heater_enabled = false;
     }
-    ESP_LOGD(TAG, "Requested filter %s", state ? "ON" : "OFF");
+  } else {
+    if (state != state_.filter_pump) {
+      pending_button_ = PUMP;
+    }
   }
+  ESP_LOGD(TAG, "Requested filter %s", state ? "ON" : "OFF");
 }
 
 void BestwaySpa::set_bubbles(bool state) {
-  if (state_.bubbles != state) {
-    if (protocol_type_ == PROTOCOL_4WIRE) {
-      state_.bubbles = state;
-    } else {
-      toggles_.bubbles_pressed = true;
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    state_.bubbles = state;
+  } else {
+    if (state != state_.bubbles) {
+      pending_button_ = BUBBLES;
     }
-    ESP_LOGD(TAG, "Requested bubbles %s", state ? "ON" : "OFF");
   }
+  ESP_LOGD(TAG, "Requested bubbles %s", state ? "ON" : "OFF");
 }
 
 void BestwaySpa::set_jets(bool state) {
@@ -1061,30 +654,30 @@ void BestwaySpa::set_jets(bool state) {
     return;
   }
 
-  if (state_.jets != state) {
-    if (protocol_type_ == PROTOCOL_4WIRE) {
-      state_.jets = state;
-    } else {
-      toggles_.jets_pressed = true;
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    state_.jets = state;
+  } else {
+    if (state != state_.jets) {
+      pending_button_ = HYDROJETS;
     }
-    ESP_LOGD(TAG, "Requested jets %s", state ? "ON" : "OFF");
   }
+  ESP_LOGD(TAG, "Requested jets %s", state ? "ON" : "OFF");
 }
 
 void BestwaySpa::set_lock(bool state) {
-  if (state_.locked != state) {
-    if (protocol_type_ == PROTOCOL_4WIRE) {
-      state_.locked = state;
-    } else {
-      toggles_.lock_pressed = true;
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    state_.locked = state;
+  } else {
+    if (state != state_.locked) {
+      pending_button_ = LOCK;
     }
-    ESP_LOGD(TAG, "Requested lock %s", state ? "ON" : "OFF");
   }
+  ESP_LOGD(TAG, "Requested lock %s", state ? "ON" : "OFF");
 }
 
 void BestwaySpa::set_unit(bool celsius) {
-  if (state_.unit_celsius != celsius) {
-    if (protocol_type_ == PROTOCOL_4WIRE) {
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    if (state_.unit_celsius != celsius) {
       state_.unit_celsius = celsius;
       // Convert temperatures
       if (celsius) {
@@ -1094,11 +687,13 @@ void BestwaySpa::set_unit(bool celsius) {
         state_.current_temp = celsius_to_fahrenheit_(state_.current_temp);
         state_.target_temp = celsius_to_fahrenheit_(state_.target_temp);
       }
-    } else {
-      toggles_.unit_pressed = true;
     }
-    ESP_LOGD(TAG, "Requested unit %s", celsius ? "C" : "F");
+  } else {
+    if (celsius != state_.unit_celsius) {
+      pending_button_ = UNIT;
+    }
   }
+  ESP_LOGD(TAG, "Requested unit %s", celsius ? "C" : "F");
 }
 
 void BestwaySpa::set_target_temp(float temp) {
@@ -1126,8 +721,7 @@ void BestwaySpa::adjust_target_temp(int8_t delta) {
     }
   } else {
     // For 6-wire, queue button presses
-    toggles_.set_target_temp = true;
-    toggles_.target_temp_delta = delta;
+    temp_adjust_steps_ += delta;
   }
 
   ESP_LOGD(TAG, "Adjusting target temperature by %d steps", delta);
@@ -1135,9 +729,8 @@ void BestwaySpa::adjust_target_temp(int8_t delta) {
 
 void BestwaySpa::set_timer(uint8_t hours) {
   ESP_LOGD(TAG, "Setting timer to %d hours", hours);
-  // Timer is typically just toggle on 6-wire
   if (protocol_type_ != PROTOCOL_4WIRE) {
-    toggles_.timer_pressed = true;
+    pending_button_ = TIMER;
   }
   state_.timer_hours = hours;
 }
@@ -1145,6 +738,9 @@ void BestwaySpa::set_timer(uint8_t hours) {
 void BestwaySpa::set_brightness(uint8_t level) {
   if (level > 8) level = 8;
   state_.brightness = level;
+  if (protocol_type_ == PROTOCOL_6WIRE_T1) {
+    dsp_type1_.get_states().brightness = level;
+  }
   ESP_LOGD(TAG, "Set brightness to %d", level);
 }
 
@@ -1178,18 +774,6 @@ bool BestwaySpa::has_air() const {
     default:
       return true;
   }
-}
-
-// =============================================================================
-// UTILITIES
-// =============================================================================
-
-uint8_t BestwaySpa::calculate_checksum_(const uint8_t *data, size_t len) {
-  uint8_t sum = 0;
-  for (size_t i = 0; i < len; i++) {
-    sum += data[i];
-  }
-  return sum;
 }
 
 }  // namespace bestway_spa
