@@ -8,59 +8,31 @@ from esphome.const import (
     STATE_CLASS_MEASUREMENT,
 )
 
-from . import bestway_spa_ns, BestwaySpa
+from . import (
+    bestway_spa_ns,
+    BestwaySpa,
+    PROTOCOL_TYPES,
+    SPA_MODELS,
+    CONF_PROTOCOL_TYPE,
+    CONF_MODEL,
+    CONF_CLK_PIN,
+    CONF_DATA_PIN,
+    CONF_CS_PIN,
+    CONF_AUDIO_PIN,
+    CONF_CURRENT_TEMPERATURE,
+    CONF_TARGET_TEMPERATURE,
+    CONF_HEATING,
+    CONF_FILTER,
+    CONF_BUBBLES,
+    CONF_JETS,
+    CONF_LOCKED,
+    CONF_POWER,
+    CONF_ERROR,
+    CONF_ERROR_TEXT,
+    CONF_DISPLAY_TEXT,
+)
 
 DEPENDENCIES = ["uart"]
-
-# Configuration keys
-CONF_PROTOCOL_TYPE = "protocol_type"
-CONF_MODEL = "model"
-CONF_CLK_PIN = "clk_pin"
-CONF_DATA_PIN = "data_pin"
-CONF_CS_PIN = "cs_pin"
-CONF_AUDIO_PIN = "audio_pin"
-CONF_CURRENT_TEMPERATURE = "current_temperature"
-CONF_TARGET_TEMPERATURE = "target_temperature"
-CONF_HEATING = "heating"
-CONF_FILTER = "filter"
-CONF_BUBBLES = "bubbles"
-CONF_JETS = "jets"
-CONF_LOCKED = "locked"
-CONF_POWER = "power"
-CONF_ERROR = "error"
-CONF_ERROR_TEXT = "error_text"
-CONF_DISPLAY_TEXT = "display_text"
-
-# Protocol types
-ProtocolType = bestway_spa_ns.enum("ProtocolType")
-PROTOCOL_TYPES = {
-    "4WIRE": ProtocolType.PROTOCOL_4WIRE,
-    "6WIRE_T1": ProtocolType.PROTOCOL_6WIRE_T1,
-    "6WIRE_T2": ProtocolType.PROTOCOL_6WIRE_T2,
-    "6WIRE": ProtocolType.PROTOCOL_6WIRE_T1,
-    "6WIRE_TYPE1": ProtocolType.PROTOCOL_6WIRE_T1,
-    "6WIRE_TYPE2": ProtocolType.PROTOCOL_6WIRE_T2,
-}
-
-# Spa models
-SpaModel = bestway_spa_ns.enum("SpaModel")
-SPA_MODELS = {
-    "PRE2021": SpaModel.MODEL_PRE2021,
-    "54149E": SpaModel.MODEL_54149E,
-    "54123": SpaModel.MODEL_54123,
-    "54138": SpaModel.MODEL_54138,
-    "54144": SpaModel.MODEL_54144,
-    "54154": SpaModel.MODEL_54154,
-    "54173": SpaModel.MODEL_54173,
-    "P05504": SpaModel.MODEL_P05504,
-    "MODEL_PRE2021": SpaModel.MODEL_PRE2021,
-    "MODEL_54149E": SpaModel.MODEL_54149E,
-    "NO54123": SpaModel.MODEL_54123,
-    "NO54138": SpaModel.MODEL_54138,
-    "NO54144": SpaModel.MODEL_54144,
-    "NO54154": SpaModel.MODEL_54154,
-    "NO54173": SpaModel.MODEL_54173,
-}
 
 
 def validate_6wire_pins(config):
@@ -76,8 +48,9 @@ def validate_6wire_pins(config):
     return config
 
 
+# Use cv.Schema instead of climate.CLIMATE_SCHEMA for ESPHome 2024+ compatibility
 CONFIG_SCHEMA = cv.All(
-    climate.CLIMATE_SCHEMA.extend({
+    cv.Schema({
         cv.GenerateID(): cv.declare_id(BestwaySpa),
 
         # Protocol configuration
