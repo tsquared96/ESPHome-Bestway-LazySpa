@@ -44,73 +44,103 @@ static volatile uint32_t g_cs_count = 0;       // CS interrupt counter
 static volatile uint32_t g_clk_count = 0;      // CLK interrupt counter
 static volatile uint32_t g_bad_packets = 0;    // Bad packet counter
 
+// Protocol state (based on VisualApproach implementation)
+static volatile bool g_packet_active = false;  // Packet transmission active
+static volatile bool g_data_is_output = false; // DATA pin is in output mode
+static volatile uint8_t g_received_byte = 0;   // Current byte being received
+static volatile uint8_t g_send_bit = 0;        // Current bit being sent (8-15)
+
+// Protocol commands from VisualApproach
+static const uint8_t DSP_CMD2_DATAREAD = 0x42;  // Command that triggers button transmission
+
 // =============================================================================
-// INTERRUPT SERVICE ROUTINES FOR 6-WIRE (Arduino native)
+// INTERRUPT SERVICE ROUTINES FOR 6-WIRE (Based on VisualApproach implementation)
 // =============================================================================
 
-// CS (Chip Select) change - handles both falling (start) and rising (end) edges
+// CS (Chip Select) change - handles packet start/end
 void IRAM_ATTR cio_cs_change_isr() {
   if (g_cio_cs_pin < 0) return;
 
   bool cs_high = digitalRead(g_cio_cs_pin);
   g_cs_count++;
 
-  if (!cs_high) {
-    // CS went LOW - falling edge - start of packet
+  if (cs_high) {
+    // CS went HIGH - end of packet
+    g_packet_active = false;
+    g_data_is_output = false;
+
+    // Validate packet length (should be 11 bytes = 88 bits for TYPE1)
+    if (g_cio_byte_count >= 11 || (g_cio_byte_count == 10 && g_cio_bit_count > 0)) {
+      g_cio_packet_ready = true;
+    } else if (g_cio_byte_count > 0) {
+      g_bad_packets++;
+    }
+  } else {
+    // CS went LOW - start of packet
+    g_packet_active = true;
     g_cio_bit_count = 0;
     g_cio_byte_count = 0;
-    g_dsp_bit_count = 0;
+    g_received_byte = 0;
 
     // Clear buffer
     for (int i = 0; i < 11; i++) {
       g_cio_buffer[i] = 0;
     }
-
-    // Pre-load the FIRST button bit BEFORE the first clock edge
-    // This ensures data is stable when CIO samples on the rising edge
-    if (g_dsp_data_pin >= 0) {
-      bool first_bit = (g_dsp_button_code >> 15) & 1;
-      digitalWrite(g_dsp_data_pin, first_bit ? HIGH : LOW);
-    }
-  } else {
-    // CS went HIGH - rising edge - end of packet
-    // Validate packet length (should be 11 bytes = 88 bits for TYPE1)
-    if (g_cio_byte_count >= 11 || (g_cio_byte_count == 10 && g_cio_bit_count > 0)) {
-      g_cio_packet_ready = true;
-    } else {
-      g_bad_packets++;
-    }
   }
 }
 
-// CLK rising edge - MITM dual-bus handler
-// 1. Read bit from CIO_DATA (input from pump controller)
-// 2. Set up NEXT button bit on DSP_DATA for the next clock cycle
-void IRAM_ATTR cio_clk_rising_isr() {
+// CLK change handler - based on VisualApproach CIO_TYPE1 implementation
+// MITM modification: separate CIO_DATA (input) and DSP_DATA (output) pins
+// Rising edge: read data bits from CIO_DATA
+// Falling edge: transmit button bits on DSP_DATA
+void IRAM_ATTR cio_clk_change_isr() {
+  if (!g_packet_active) return;
+
   g_clk_count++;
+  bool clk_high = digitalRead(g_cio_clk_pin);
 
-  // --- READ from CIO_DATA (input) ---
-  if (g_cio_data_pin >= 0 && g_cio_byte_count < 11) {
-    bool bit_value = digitalRead(g_cio_data_pin);
+  if (clk_high) {
+    // --- RISING EDGE: Read data from CIO_DATA ---
+    if (g_cio_data_pin >= 0) {
+      // Shift in bit (LSB first based on VA code: >> 1 | bit << 7)
+      g_received_byte = (g_received_byte >> 1) | (digitalRead(g_cio_data_pin) << 7);
+      g_cio_bit_count++;
 
-    // Store bit in buffer (MSB first)
-    g_cio_buffer[g_cio_byte_count] = (g_cio_buffer[g_cio_byte_count] << 1) | (bit_value ? 1 : 0);
-    g_cio_bit_count++;
+      if (g_cio_bit_count == 8) {
+        g_cio_bit_count = 0;
 
-    if (g_cio_bit_count >= 8) {
-      g_cio_bit_count = 0;
-      g_cio_byte_count++;
+        // Store the received byte
+        if (g_cio_byte_count < 11) {
+          g_cio_buffer[g_cio_byte_count] = g_received_byte;
+          g_cio_byte_count++;
+        }
+
+        // Check if CIO is requesting button data (DSP_CMD2_DATAREAD = 0x42)
+        if (g_received_byte == DSP_CMD2_DATAREAD) {
+          g_send_bit = 8;  // Start sending from bit 8
+          g_data_is_output = true;
+        }
+
+        g_received_byte = 0;
+      }
     }
-  }
+  } else {
+    // --- FALLING EDGE: Transmit button bits on DSP_DATA ---
+    // DSP_DATA is always OUTPUT in MITM config (separate from CIO_DATA)
+    if (g_data_is_output && g_dsp_data_pin >= 0) {
+      // Send button code bit (based on VA: check if bit is set in _button_code)
+      if (g_dsp_button_code & (1 << g_send_bit)) {
+        digitalWrite(g_dsp_data_pin, HIGH);
+      } else {
+        digitalWrite(g_dsp_data_pin, LOW);
+      }
 
-  // --- WRITE to DSP_DATA (output) ---
-  // The CURRENT bit was already set up before this clock edge
-  // Now set up the NEXT bit for the NEXT clock edge
-  g_dsp_bit_count++;
-  if (g_dsp_data_pin >= 0 && g_dsp_bit_count < 16) {
-    // Set up the next bit (will be sampled on NEXT rising edge)
-    bool next_bit = (g_dsp_button_code >> (15 - g_dsp_bit_count)) & 1;
-    digitalWrite(g_dsp_data_pin, next_bit ? HIGH : LOW);
+      g_send_bit++;
+      if (g_send_bit > 15) {
+        g_send_bit = 0;
+        g_data_is_output = false;  // Done sending button code
+      }
+    }
   }
 }
 
@@ -151,12 +181,13 @@ void BestwaySpa::setup() {
   if (protocol_type_ == PROTOCOL_6WIRE_T1 || protocol_type_ == PROTOCOL_6WIRE_T2) {
     // --- CIO BUS PINS (input from pump controller) ---
 
-    // CIO Clock - INPUT with interrupt on rising edge
+    // CIO Clock - INPUT with interrupt on BOTH edges (CHANGE mode)
+    // Based on VisualApproach: rising edge reads data, falling edge sends buttons
     if (cio_clk_pin_ != nullptr) {
       g_cio_clk_pin = cio_clk_pin_->get_pin();
       pinMode(g_cio_clk_pin, INPUT);
-      attachInterrupt(digitalPinToInterrupt(g_cio_clk_pin), cio_clk_rising_isr, RISING);
-      ESP_LOGD(TAG, "CIO_CLK interrupt attached on GPIO%d", g_cio_clk_pin);
+      attachInterrupt(digitalPinToInterrupt(g_cio_clk_pin), cio_clk_change_isr, CHANGE);
+      ESP_LOGD(TAG, "CIO_CLK interrupt attached on GPIO%d (CHANGE mode)", g_cio_clk_pin);
     }
 
     // CIO Data - INPUT (read display data from pump controller)
