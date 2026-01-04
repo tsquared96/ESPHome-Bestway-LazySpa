@@ -151,7 +151,7 @@ void BestwaySpa::setup() {
   }
 
   // Initialize climate state
-  this->mode = climate::CLIMATE_MODE_OFF;
+  this->mode = climate::CLIMATE_MODE_HEAT;
   this->action = climate::CLIMATE_ACTION_IDLE;
   this->current_temperature = state_.current_temp;
   this->target_temperature = state_.target_temp;
