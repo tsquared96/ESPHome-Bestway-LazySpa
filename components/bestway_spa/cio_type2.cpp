@@ -16,6 +16,10 @@
 
 #include "cio_type2.h"
 
+#ifdef ESP8266
+#include <eagle_soc.h>  // For READ_PERI_REG, WRITE_PERI_REG
+#endif
+
 namespace esphome {
 namespace bestway_spa {
 
