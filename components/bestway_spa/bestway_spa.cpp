@@ -303,15 +303,14 @@ climate::ClimateTraits BestwaySpa::traits() {
   traits.add_supported_mode(climate::CLIMATE_MODE_HEAT);
   traits.add_supported_mode(climate::CLIMATE_MODE_FAN_ONLY);
 
-  if (state_.unit_celsius) {
-    traits.set_visual_min_temperature(20.0f);
-    traits.set_visual_max_temperature(40.0f);
-  } else {
-    traits.set_visual_min_temperature(68.0f);
-    traits.set_visual_max_temperature(104.0f);
-  }
-
+  // Always use Celsius range - ESPHome climate works in Celsius internally
+  // Home Assistant will display in user's preferred unit
+  traits.set_visual_min_temperature(20.0f);
+  traits.set_visual_max_temperature(40.0f);
   traits.set_visual_temperature_step(1.0f);
+
+  // Support both Celsius and Fahrenheit display
+  traits.set_supports_current_temperature(true);
 
   return traits;
 }
@@ -530,6 +529,13 @@ void BestwaySpa::parse_6wire_cio_packet_(const uint8_t *packet) {
   new_state.display_chars[2] = display_chars[2];
   new_state.display_chars[3] = '\0';
   new_state.heater_enabled = new_state.heater_green || new_state.heater_red;
+
+  // Always store temperature in Celsius internally
+  // If spa is displaying Fahrenheit, convert to Celsius
+  if (!new_state.unit_celsius && new_state.current_temp > 50.0f) {
+    // Temperature looks like Fahrenheit (> 50), convert to Celsius
+    new_state.current_temp = (new_state.current_temp - 32.0f) * 5.0f / 9.0f;
+  }
 
   // Debounce: Check if new state matches pending state
   bool states_match =
