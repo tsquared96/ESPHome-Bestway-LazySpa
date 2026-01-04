@@ -13,6 +13,7 @@ from esphome.const import (
 from . import bestway_spa_ns, BestwaySpa, CONF_BESTWAY_SPA_ID
 
 DEPENDENCIES = ["uart"]
+AUTO_LOAD = ["sensor", "binary_sensor", "text_sensor"]
 
 # Protocol types
 ProtocolType = bestway_spa_ns.enum("ProtocolType")
