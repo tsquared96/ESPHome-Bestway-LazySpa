@@ -262,23 +262,17 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   bool has_air() const;
   SpaModel get_model() const { return model_; }
 
+  // Data pin access for ISR (must be public for ISR callback)
+  bool read_data_pin_();
+  void write_data_pin_(bool value);
+
  protected:
   // Protocol handlers
   void handle_4wire_protocol_();
-  void handle_6wire_type1_protocol_();
-  void handle_6wire_type2_protocol_();
+  void handle_6wire_protocol_();  // Interrupt-driven 6-wire handler
 
-  // 6-wire SPI-like bit-banging
-  void send_bits_to_dsp_(uint32_t data, uint8_t bits);
-  uint16_t receive_bits_from_dsp_(uint8_t bits);
-  void pulse_clock_(uint32_t duration_us = 50);
-
-  // 6-wire packet handling
-  void send_dsp_payload_type1_();
-  void send_dsp_payload_type2_();
-  void receive_cio_payload_type1_();
-  void receive_cio_payload_type2_();
-  uint16_t get_pressed_button_();
+  // 6-wire packet handling (interrupt-driven)
+  void parse_6wire_cio_packet_(const uint8_t *packet);
 
   // 4-wire packet handling
   void parse_4wire_packet_(const std::vector<uint8_t> &packet);
@@ -341,8 +335,13 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   uint32_t last_packet_time_{0};
   uint32_t last_state_update_{0};
   uint32_t last_sensor_update_{0};
-  uint32_t last_dsp_refresh_{0};
-  uint32_t last_button_poll_{0};
+  uint32_t last_stats_time_{0};
+
+  // Statistics (for 6-wire interrupt-driven)
+  uint32_t good_packets_{0};
+  uint32_t last_cs_count_{0};
+  uint32_t last_clk_count_{0};
+  uint32_t last_pkt_count_{0};
 
   // Button queue
   std::vector<ButtonQueueItem> button_queue_;
