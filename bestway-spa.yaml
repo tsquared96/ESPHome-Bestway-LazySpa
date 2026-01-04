@@ -61,11 +61,20 @@ uart:
 # =============================================================================
 # Custom Component
 # =============================================================================
+# Option 1: Use GitHub repository (recommended for most users)
 external_components:
   - source:
-      type: local
-      path: components
+      type: git
+      url: https://github.com/tsquared96/ESPHome-Bestway-LazySpa
+      ref: claude/fix-spa-controls-pbVlc
     components: [ bestway_spa ]
+
+# Option 2: Use local path (if you cloned the repo locally)
+# external_components:
+#   - source:
+#       type: local
+#       path: /config/esphome/ESPHome-Bestway-LazySpa/components
+#     components: [ bestway_spa ]
 
 # =============================================================================
 # CLIMATE CONFIGURATION
