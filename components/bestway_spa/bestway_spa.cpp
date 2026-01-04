@@ -65,6 +65,13 @@ void IRAM_ATTR cio_cs_change_isr() {
     for (int i = 0; i < 11; i++) {
       g_cio_buffer[i] = 0;
     }
+
+    // Pre-load the FIRST button bit BEFORE the first clock edge
+    // This ensures data is stable when CIO samples on the rising edge
+    if (g_dsp_data_pin >= 0) {
+      bool first_bit = (g_dsp_button_code >> 15) & 1;
+      digitalWrite(g_dsp_data_pin, first_bit ? HIGH : LOW);
+    }
   } else {
     // CS went HIGH - rising edge - end of packet
     // Validate packet length (should be 11 bytes = 88 bits for TYPE1)
@@ -78,7 +85,7 @@ void IRAM_ATTR cio_cs_change_isr() {
 
 // CLK rising edge - MITM dual-bus handler
 // 1. Read bit from CIO_DATA (input from pump controller)
-// 2. Write button code bit to DSP_DATA (output to pump controller)
+// 2. Set up NEXT button bit on DSP_DATA for the next clock cycle
 void IRAM_ATTR cio_clk_rising_isr() {
   g_clk_count++;
 
@@ -97,14 +104,14 @@ void IRAM_ATTR cio_clk_rising_isr() {
   }
 
   // --- WRITE to DSP_DATA (output) ---
-  // Send 16-bit button code (MSB first) during the first 16 clock pulses
-  if (g_dsp_data_pin >= 0 && g_dsp_bit_count < 16) {
-    // Extract the bit to send (MSB first)
-    bool bit_to_send = (g_dsp_button_code >> (15 - g_dsp_bit_count)) & 1;
-    digitalWrite(g_dsp_data_pin, bit_to_send ? HIGH : LOW);
-  }
-
+  // The CURRENT bit was already set up before this clock edge
+  // Now set up the NEXT bit for the NEXT clock edge
   g_dsp_bit_count++;
+  if (g_dsp_data_pin >= 0 && g_dsp_bit_count < 16) {
+    // Set up the next bit (will be sampled on NEXT rising edge)
+    bool next_bit = (g_dsp_button_code >> (15 - g_dsp_bit_count)) & 1;
+    digitalWrite(g_dsp_data_pin, next_bit ? HIGH : LOW);
+  }
 }
 
 // =============================================================================
