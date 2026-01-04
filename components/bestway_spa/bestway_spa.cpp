@@ -881,8 +881,8 @@ void BestwaySpa::set_lock(bool state) {
 }
 
 void BestwaySpa::set_unit(bool celsius) {
-  if (state_.unit_celsius != celsius) {
-    if (protocol_type_ == PROTOCOL_4WIRE) {
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    if (state_.unit_celsius != celsius) {
       state_.unit_celsius = celsius;
       if (celsius) {
         state_.current_temp = fahrenheit_to_celsius_(state_.current_temp);
@@ -891,10 +891,11 @@ void BestwaySpa::set_unit(bool celsius) {
         state_.current_temp = celsius_to_fahrenheit_(state_.current_temp);
         state_.target_temp = celsius_to_fahrenheit_(state_.target_temp);
       }
-    } else {
-      toggles_.unit_pressed = true;
-      ESP_LOGD(TAG, "Requested unit %s", celsius ? "C" : "F");
     }
+  } else {
+    // 6-wire: Always queue button press - it's a toggle
+    toggles_.unit_pressed = true;
+    ESP_LOGI(TAG, "Requested unit toggle (want %s)", celsius ? "C" : "F");
   }
 }
 

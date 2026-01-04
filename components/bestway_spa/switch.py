@@ -12,6 +12,7 @@ BestwaySpaBubblesSwitch = bestway_spa_ns.class_("BestwaySpaBubblesSwitch", switc
 BestwaySpaJetsSwitch = bestway_spa_ns.class_("BestwaySpaJetsSwitch", switch.Switch, cg.Component)
 BestwaySpaLockSwitch = bestway_spa_ns.class_("BestwaySpaLockSwitch", switch.Switch, cg.Component)
 BestwaySpaPowerSwitch = bestway_spa_ns.class_("BestwaySpaPowerSwitch", switch.Switch, cg.Component)
+BestwaySpaUnitSwitch = bestway_spa_ns.class_("BestwaySpaUnitSwitch", switch.Switch, cg.Component)
 
 SWITCH_TYPES = {
     "heater": BestwaySpaHeaterSwitch,
@@ -20,6 +21,7 @@ SWITCH_TYPES = {
     "jets": BestwaySpaJetsSwitch,
     "lock": BestwaySpaLockSwitch,
     "power": BestwaySpaPowerSwitch,
+    "unit": BestwaySpaUnitSwitch,
 }
 
 
@@ -43,6 +45,7 @@ CONFIG_SCHEMA = cv.typed_schema({
     "jets": _create_switch_schema(BestwaySpaJetsSwitch),
     "lock": _create_switch_schema(BestwaySpaLockSwitch),
     "power": _create_switch_schema(BestwaySpaPowerSwitch),
+    "unit": _create_switch_schema(BestwaySpaUnitSwitch),
 })
 
 

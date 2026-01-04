@@ -227,6 +227,12 @@ switch:
     icon: mdi:lock
     bestway_spa_id: hot_tub
 
+  - platform: bestway_spa
+    type: unit
+    name: "${friendly_name} Celsius"
+    icon: mdi:thermometer
+    bestway_spa_id: hot_tub
+
 # =============================================================================
 # SYSTEM SENSORS
 # =============================================================================

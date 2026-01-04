@@ -448,5 +448,17 @@ class BestwaySpaPowerSwitch : public switch_::Switch, public Component {
   BestwaySpa *parent_{nullptr};
 };
 
+class BestwaySpaUnitSwitch : public switch_::Switch, public Component {
+ public:
+  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void write_state(bool state) override {
+    // state: true = Celsius, false = Fahrenheit
+    parent_->set_unit(state);
+    publish_state(state);
+  }
+ protected:
+  BestwaySpa *parent_{nullptr};
+};
+
 }  // namespace bestway_spa
 }  // namespace esphome
