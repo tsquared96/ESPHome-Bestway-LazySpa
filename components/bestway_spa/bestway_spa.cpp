@@ -16,6 +16,7 @@
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
 #include <Arduino.h>
+#include <cmath>
 
 namespace esphome {
 namespace bestway_spa {
@@ -472,6 +473,12 @@ void BestwaySpa::handle_6wire_protocol_() {
   if (is_type1) {
     if (cio_type1.isPacketReady()) {
       has_packet = cio_type1.getPacket(packet, 11);
+
+      // Validate packet structure before parsing
+      if (has_packet && !CioType1::validatePacket(packet)) {
+        ESP_LOGV(TAG, "Rejected invalid TYPE1 packet");
+        has_packet = false;
+      }
     }
   } else {
     if (cio_type2.isPacketReady()) {
@@ -486,55 +493,88 @@ void BestwaySpa::handle_6wire_protocol_() {
 }
 
 void BestwaySpa::parse_6wire_cio_packet_(const uint8_t *packet) {
+  // Parse into temporary/pending state first (for debouncing)
+  SpaState new_state;
+  char display_chars[4];
+
   // Use protocol-specific parsing
   if (is_type1) {
     // Log raw packet for debugging
-    ESP_LOGD(TAG, "CIO Raw: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+    ESP_LOGV(TAG, "CIO Raw: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
              packet[0], packet[1], packet[2], packet[3], packet[4],
              packet[5], packet[6], packet[7], packet[8], packet[9], packet[10]);
 
     // Use CioType1 static parser
-    char display_chars[4];
     CioType1::parsePacket(packet,
-                          &state_.current_temp,
-                          &state_.heater_red, &state_.heater_green,
-                          &state_.filter_pump, &state_.bubbles, &state_.jets,
-                          &state_.locked, &state_.power, &state_.unit_celsius,
+                          &new_state.current_temp,
+                          &new_state.heater_red, &new_state.heater_green,
+                          &new_state.filter_pump, &new_state.bubbles, &new_state.jets,
+                          &new_state.locked, &new_state.power, &new_state.unit_celsius,
                           display_chars);
-
-    state_.display_chars[0] = display_chars[0];
-    state_.display_chars[1] = display_chars[1];
-    state_.display_chars[2] = display_chars[2];
-    state_.display_chars[3] = '\0';
-
   } else {
     // Log raw packet for debugging
-    ESP_LOGD(TAG, "CIO Raw: %02X %02X %02X %02X %02X",
+    ESP_LOGV(TAG, "CIO Raw: %02X %02X %02X %02X %02X",
              packet[0], packet[1], packet[2], packet[3], packet[4]);
 
     // Use CioType2 static parser
-    char display_chars[4];
     CioType2::parsePacket(packet,
-                          &state_.current_temp,
-                          &state_.heater_red, &state_.heater_green,
-                          &state_.filter_pump, &state_.bubbles, &state_.jets,
-                          &state_.locked, &state_.power, &state_.unit_celsius,
+                          &new_state.current_temp,
+                          &new_state.heater_red, &new_state.heater_green,
+                          &new_state.filter_pump, &new_state.bubbles, &new_state.jets,
+                          &new_state.locked, &new_state.power, &new_state.unit_celsius,
                           display_chars);
-
-    state_.display_chars[0] = display_chars[0];
-    state_.display_chars[1] = display_chars[1];
-    state_.display_chars[2] = display_chars[2];
-    state_.display_chars[3] = '\0';
   }
 
-  state_.heater_enabled = state_.heater_green || state_.heater_red;
+  new_state.display_chars[0] = display_chars[0];
+  new_state.display_chars[1] = display_chars[1];
+  new_state.display_chars[2] = display_chars[2];
+  new_state.display_chars[3] = '\0';
+  new_state.heater_enabled = new_state.heater_green || new_state.heater_red;
 
-  ESP_LOGD(TAG, "CIO Chars: '%c' '%c' '%c' Temp:%.0f Power:%d Heat:%d Pump:%d",
-           state_.display_chars[0], state_.display_chars[1], state_.display_chars[2],
-           state_.current_temp,
-           state_.power ? 1 : 0,
-           state_.heater_enabled ? 1 : 0,
-           state_.filter_pump ? 1 : 0);
+  // Debounce: Check if new state matches pending state
+  bool states_match =
+      (new_state.power == pending_state_.power) &&
+      (new_state.heater_red == pending_state_.heater_red) &&
+      (new_state.heater_green == pending_state_.heater_green) &&
+      (new_state.filter_pump == pending_state_.filter_pump) &&
+      (new_state.bubbles == pending_state_.bubbles) &&
+      (new_state.jets == pending_state_.jets) &&
+      (new_state.locked == pending_state_.locked) &&
+      (std::fabs(new_state.current_temp - pending_state_.current_temp) < 1.0f);
+
+  if (states_match) {
+    state_match_count_++;
+  } else {
+    // New state differs from pending - start fresh
+    pending_state_ = new_state;
+    state_match_count_ = 1;
+  }
+
+  // Only update actual state when we have consistent readings
+  if (state_match_count_ >= STATE_DEBOUNCE_COUNT) {
+    // Update actual state
+    state_.power = new_state.power;
+    state_.heater_red = new_state.heater_red;
+    state_.heater_green = new_state.heater_green;
+    state_.heater_enabled = new_state.heater_enabled;
+    state_.filter_pump = new_state.filter_pump;
+    state_.bubbles = new_state.bubbles;
+    state_.jets = new_state.jets;
+    state_.locked = new_state.locked;
+    state_.unit_celsius = new_state.unit_celsius;
+    state_.current_temp = new_state.current_temp;
+    state_.display_chars[0] = new_state.display_chars[0];
+    state_.display_chars[1] = new_state.display_chars[1];
+    state_.display_chars[2] = new_state.display_chars[2];
+    state_.display_chars[3] = '\0';
+
+    ESP_LOGD(TAG, "CIO Chars: '%c' '%c' '%c' Temp:%.0f Power:%d Heat:%d Pump:%d",
+             state_.display_chars[0], state_.display_chars[1], state_.display_chars[2],
+             state_.current_temp,
+             state_.power ? 1 : 0,
+             state_.heater_enabled ? 1 : 0,
+             state_.filter_pump ? 1 : 0);
+  }
 }
 
 // =============================================================================

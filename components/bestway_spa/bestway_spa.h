@@ -371,6 +371,11 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   uint8_t bit_counter_{0};
   uint8_t byte_buffer_{0};
 
+  // State debouncing - require consistent readings before updating
+  SpaState pending_state_;
+  uint8_t state_match_count_{0};
+  static const uint8_t STATE_DEBOUNCE_COUNT = 3;  // Require 3 matching packets
+
   // 4-wire state
   bool waiting_for_response_{false};
   uint8_t heater_stage_{0};

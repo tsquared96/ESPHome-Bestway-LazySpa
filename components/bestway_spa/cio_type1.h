@@ -99,6 +99,9 @@ class CioType1 {
   // Decode 7-segment character
   static char decodeChar(uint8_t segments);
 
+  // Validate packet structure (returns true if packet looks valid)
+  static bool validatePacket(const uint8_t* packet);
+
   // Parse packet into state values
   static void parsePacket(const uint8_t* packet,
                           float* current_temp,

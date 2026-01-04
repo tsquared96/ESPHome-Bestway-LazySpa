@@ -146,6 +146,42 @@ bool CioType1::isPacketReady() {
 }
 
 // =============================================================================
+// Validate packet structure
+// Returns true if packet appears valid
+// =============================================================================
+
+bool CioType1::validatePacket(const uint8_t* packet) {
+  // TYPE1 packets have a specific structure with alternating command/data bytes
+  // Bytes at even positions (2, 4, 6) are typically 0xFE (filler/command)
+  // Bytes at odd positions (1, 3, 5) are display segment data
+
+  // Check for alternating pattern - bytes 2, 4, 6 should be similar
+  uint8_t cmd_byte = packet[2];
+  if (packet[4] != cmd_byte || packet[6] != cmd_byte) {
+    return false;  // Command bytes should be consistent
+  }
+
+  // Check that display bytes (1, 3, 5) look like valid 7-segment patterns
+  // Valid patterns have multiple bits set (0x00 is also valid for blank)
+  // Reject if all display bytes are the same (likely corruption)
+  if (packet[1] == packet[3] && packet[3] == packet[5] && packet[1] != 0x00) {
+    // All three display bytes identical (and non-zero) is suspicious
+    // unless it's showing "888" or similar
+    if (packet[1] != 0xFF) {  // 0xFF = '8'
+      return false;
+    }
+  }
+
+  // Check that status bytes (7, 9) have reasonable values
+  // These shouldn't all be 0xFF (all LEDs on is unlikely)
+  if (packet[7] == 0xFF && packet[9] == 0xFF) {
+    return false;
+  }
+
+  return true;
+}
+
+// =============================================================================
 // Get packet data (copies to buffer, clears ready flag)
 // =============================================================================
 
