@@ -240,6 +240,27 @@ void IRAM_ATTR CIO_TYPE1::isr_packet_handler() {
 void IRAM_ATTR CIO_TYPE1::isr_clk_handler() {
   clk_interrupt_count_++;  // Debug counter
 
+  // Fallback: Poll CS state if CS interrupt isn't working
+  // Check CS state on every clock edge
+#ifdef ESP8266
+  bool cs_high = GPI & (1 << cs_pin_);
+#else
+  bool cs_high = digitalRead(cs_pin_);
+#endif
+
+  // Detect CS transitions by comparing with packet_transm_active state
+  if (!cs_high && !packet_transm_active_) {
+    // CS went LOW - start of packet
+    packet_transm_active_ = true;
+    cs_interrupt_count_++;  // Count this as a virtual CS interrupt
+  } else if (cs_high && packet_transm_active_) {
+    // CS went HIGH - end of packet
+    packet_transm_active_ = false;
+    data_is_output_ = false;
+    eop_handler();
+    return;  // Don't process this clock edge
+  }
+
   if (!packet_transm_active_)
     return;
 
