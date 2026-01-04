@@ -17,6 +17,18 @@ BestwaySpaTimerSwitch = bestway_spa_ns.class_("BestwaySpaTimerSwitch", switch.Sw
 BestwaySpaUpButton = bestway_spa_ns.class_("BestwaySpaUpButton", switch.Switch, cg.Component)
 BestwaySpaDownButton = bestway_spa_ns.class_("BestwaySpaDownButton", switch.Switch, cg.Component)
 
+# Button enable/disable switches
+BestwaySpaHeaterBtnEnabled = bestway_spa_ns.class_("BestwaySpaHeaterBtnEnabled", switch.Switch, cg.Component)
+BestwaySpaFilterBtnEnabled = bestway_spa_ns.class_("BestwaySpaFilterBtnEnabled", switch.Switch, cg.Component)
+BestwaySpaBubblesBtnEnabled = bestway_spa_ns.class_("BestwaySpaBubblesBtnEnabled", switch.Switch, cg.Component)
+BestwaySpaJetsBtnEnabled = bestway_spa_ns.class_("BestwaySpaJetsBtnEnabled", switch.Switch, cg.Component)
+BestwaySpaLockBtnEnabled = bestway_spa_ns.class_("BestwaySpaLockBtnEnabled", switch.Switch, cg.Component)
+BestwaySpaPowerBtnEnabled = bestway_spa_ns.class_("BestwaySpaPowerBtnEnabled", switch.Switch, cg.Component)
+BestwaySpaUnitBtnEnabled = bestway_spa_ns.class_("BestwaySpaUnitBtnEnabled", switch.Switch, cg.Component)
+BestwaySpaTimerBtnEnabled = bestway_spa_ns.class_("BestwaySpaTimerBtnEnabled", switch.Switch, cg.Component)
+BestwaySpaUpBtnEnabled = bestway_spa_ns.class_("BestwaySpaUpBtnEnabled", switch.Switch, cg.Component)
+BestwaySpaDownBtnEnabled = bestway_spa_ns.class_("BestwaySpaDownBtnEnabled", switch.Switch, cg.Component)
+
 SWITCH_TYPES = {
     "heater": BestwaySpaHeaterSwitch,
     "filter": BestwaySpaFilterSwitch,
@@ -28,6 +40,17 @@ SWITCH_TYPES = {
     "timer": BestwaySpaTimerSwitch,
     "up": BestwaySpaUpButton,
     "down": BestwaySpaDownButton,
+    # Button enable switches
+    "heater_btn_enabled": BestwaySpaHeaterBtnEnabled,
+    "filter_btn_enabled": BestwaySpaFilterBtnEnabled,
+    "bubbles_btn_enabled": BestwaySpaBubblesBtnEnabled,
+    "jets_btn_enabled": BestwaySpaJetsBtnEnabled,
+    "lock_btn_enabled": BestwaySpaLockBtnEnabled,
+    "power_btn_enabled": BestwaySpaPowerBtnEnabled,
+    "unit_btn_enabled": BestwaySpaUnitBtnEnabled,
+    "timer_btn_enabled": BestwaySpaTimerBtnEnabled,
+    "up_btn_enabled": BestwaySpaUpBtnEnabled,
+    "down_btn_enabled": BestwaySpaDownBtnEnabled,
 }
 
 
@@ -55,6 +78,17 @@ CONFIG_SCHEMA = cv.typed_schema({
     "timer": _create_switch_schema(BestwaySpaTimerSwitch),
     "up": _create_switch_schema(BestwaySpaUpButton),
     "down": _create_switch_schema(BestwaySpaDownButton),
+    # Button enable switches
+    "heater_btn_enabled": _create_switch_schema(BestwaySpaHeaterBtnEnabled),
+    "filter_btn_enabled": _create_switch_schema(BestwaySpaFilterBtnEnabled),
+    "bubbles_btn_enabled": _create_switch_schema(BestwaySpaBubblesBtnEnabled),
+    "jets_btn_enabled": _create_switch_schema(BestwaySpaJetsBtnEnabled),
+    "lock_btn_enabled": _create_switch_schema(BestwaySpaLockBtnEnabled),
+    "power_btn_enabled": _create_switch_schema(BestwaySpaPowerBtnEnabled),
+    "unit_btn_enabled": _create_switch_schema(BestwaySpaUnitBtnEnabled),
+    "timer_btn_enabled": _create_switch_schema(BestwaySpaTimerBtnEnabled),
+    "up_btn_enabled": _create_switch_schema(BestwaySpaUpBtnEnabled),
+    "down_btn_enabled": _create_switch_schema(BestwaySpaDownBtnEnabled),
 })
 
 

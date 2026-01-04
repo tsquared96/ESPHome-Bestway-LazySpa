@@ -941,6 +941,22 @@ void BestwaySpa::set_brightness(uint8_t level) {
   ESP_LOGD(TAG, "Set brightness to %d", level);
 }
 
+void BestwaySpa::set_button_enabled(Buttons btn, bool enabled) {
+  if (btn >= BTN_COUNT) {
+    ESP_LOGW(TAG, "Invalid button index %d", btn);
+    return;
+  }
+  button_enabled_[btn] = enabled;
+  ESP_LOGI(TAG, "Button %d %s", btn, enabled ? "enabled" : "disabled");
+}
+
+bool BestwaySpa::is_button_enabled(Buttons btn) const {
+  if (btn >= BTN_COUNT) {
+    return false;
+  }
+  return button_enabled_[btn];
+}
+
 // =============================================================================
 // STATE GETTERS
 // =============================================================================

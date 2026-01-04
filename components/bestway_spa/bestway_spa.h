@@ -265,6 +265,10 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   void set_timer(uint8_t hours);
   void set_brightness(uint8_t level);
 
+  // Button enable/disable control
+  void set_button_enabled(Buttons btn, bool enabled);
+  bool is_button_enabled(Buttons btn) const;
+
   // State getters
   const SpaState& get_state() const { return state_; }
   bool has_jets() const;
@@ -493,6 +497,121 @@ class BestwaySpaDownButton : public switch_::Switch, public Component {
       parent_->adjust_target_temp(-1);  // -1 degree
     }
     publish_state(false);  // Momentary - always return to off
+  }
+ protected:
+  BestwaySpa *parent_{nullptr};
+};
+
+// =============================================================================
+// BUTTON ENABLE/DISABLE SWITCHES
+// =============================================================================
+// These switches allow enabling/disabling individual buttons from Home Assistant
+
+class BestwaySpaHeaterBtnEnabled : public switch_::Switch, public Component {
+ public:
+  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void write_state(bool state) override {
+    parent_->set_button_enabled(HEAT, state);
+    publish_state(state);
+  }
+ protected:
+  BestwaySpa *parent_{nullptr};
+};
+
+class BestwaySpaFilterBtnEnabled : public switch_::Switch, public Component {
+ public:
+  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void write_state(bool state) override {
+    parent_->set_button_enabled(PUMP, state);
+    publish_state(state);
+  }
+ protected:
+  BestwaySpa *parent_{nullptr};
+};
+
+class BestwaySpaBubblesBtnEnabled : public switch_::Switch, public Component {
+ public:
+  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void write_state(bool state) override {
+    parent_->set_button_enabled(BUBBLES, state);
+    publish_state(state);
+  }
+ protected:
+  BestwaySpa *parent_{nullptr};
+};
+
+class BestwaySpaJetsBtnEnabled : public switch_::Switch, public Component {
+ public:
+  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void write_state(bool state) override {
+    parent_->set_button_enabled(HYDROJETS, state);
+    publish_state(state);
+  }
+ protected:
+  BestwaySpa *parent_{nullptr};
+};
+
+class BestwaySpaLockBtnEnabled : public switch_::Switch, public Component {
+ public:
+  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void write_state(bool state) override {
+    parent_->set_button_enabled(LOCK, state);
+    publish_state(state);
+  }
+ protected:
+  BestwaySpa *parent_{nullptr};
+};
+
+class BestwaySpaPowerBtnEnabled : public switch_::Switch, public Component {
+ public:
+  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void write_state(bool state) override {
+    parent_->set_button_enabled(POWER, state);
+    publish_state(state);
+  }
+ protected:
+  BestwaySpa *parent_{nullptr};
+};
+
+class BestwaySpaUnitBtnEnabled : public switch_::Switch, public Component {
+ public:
+  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void write_state(bool state) override {
+    parent_->set_button_enabled(UNIT, state);
+    publish_state(state);
+  }
+ protected:
+  BestwaySpa *parent_{nullptr};
+};
+
+class BestwaySpaTimerBtnEnabled : public switch_::Switch, public Component {
+ public:
+  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void write_state(bool state) override {
+    parent_->set_button_enabled(TIMER, state);
+    publish_state(state);
+  }
+ protected:
+  BestwaySpa *parent_{nullptr};
+};
+
+class BestwaySpaUpBtnEnabled : public switch_::Switch, public Component {
+ public:
+  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void write_state(bool state) override {
+    parent_->set_button_enabled(UP, state);
+    publish_state(state);
+  }
+ protected:
+  BestwaySpa *parent_{nullptr};
+};
+
+class BestwaySpaDownBtnEnabled : public switch_::Switch, public Component {
+ public:
+  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void write_state(bool state) override {
+    parent_->set_button_enabled(DOWN, state);
+    publish_state(state);
   }
  protected:
   BestwaySpa *parent_{nullptr};

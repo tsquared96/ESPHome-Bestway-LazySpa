@@ -251,6 +251,67 @@ switch:
     icon: mdi:arrow-down-bold
     bestway_spa_id: hot_tub
 
+  # Button enable/disable switches (allows disabling individual controls)
+  - platform: bestway_spa
+    type: heater_btn_enabled
+    name: "${friendly_name} Heater Button Enabled"
+    icon: mdi:radiator-disabled
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    type: filter_btn_enabled
+    name: "${friendly_name} Filter Button Enabled"
+    icon: mdi:air-filter
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    type: bubbles_btn_enabled
+    name: "${friendly_name} Bubbles Button Enabled"
+    icon: mdi:chart-bubble
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    type: jets_btn_enabled
+    name: "${friendly_name} Jets Button Enabled"
+    icon: mdi:waves
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    type: power_btn_enabled
+    name: "${friendly_name} Power Button Enabled"
+    icon: mdi:power
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    type: lock_btn_enabled
+    name: "${friendly_name} Lock Button Enabled"
+    icon: mdi:lock
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    type: unit_btn_enabled
+    name: "${friendly_name} Unit Button Enabled"
+    icon: mdi:thermometer
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    type: timer_btn_enabled
+    name: "${friendly_name} Timer Button Enabled"
+    icon: mdi:timer
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    type: up_btn_enabled
+    name: "${friendly_name} Up Button Enabled"
+    icon: mdi:arrow-up-bold
+    bestway_spa_id: hot_tub
+
+  - platform: bestway_spa
+    type: down_btn_enabled
+    name: "${friendly_name} Down Button Enabled"
+    icon: mdi:arrow-down-bold
+    bestway_spa_id: hot_tub
+
 # =============================================================================
 # SYSTEM SENSORS
 # =============================================================================
