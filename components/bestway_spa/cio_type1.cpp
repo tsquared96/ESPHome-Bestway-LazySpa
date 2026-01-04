@@ -52,14 +52,34 @@ void CIO_TYPE1::setup(int data_pin, int clk_pin, int cs_pin) {
 
   button_code_ = get_button_code(NOBTN);
 
+  // Set pin modes - all inputs initially
   pinMode(cs_pin_, INPUT);
   pinMode(data_pin_, INPUT);
   pinMode(clk_pin_, INPUT);
 
-  attachInterrupt(digitalPinToInterrupt(cs_pin_), isr_cs_wrapper, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(clk_pin_), isr_clk_wrapper, CHANGE);
+  // Get interrupt numbers
+  int cs_int = digitalPinToInterrupt(cs_pin_);
+  int clk_int = digitalPinToInterrupt(clk_pin_);
 
-  ESP_LOGI(TAG, "CIO TYPE1 initialized - CLK:%d DATA:%d CS:%d", clk_pin_, data_pin_, cs_pin_);
+  ESP_LOGI(TAG, "CIO TYPE1 setup - CLK:GPIO%d(int%d) DATA:GPIO%d CS:GPIO%d(int%d)",
+           clk_pin_, clk_int, data_pin_, cs_pin_, cs_int);
+
+  // Attach interrupts
+  if (cs_int >= 0) {
+    attachInterrupt(cs_int, isr_cs_wrapper, CHANGE);
+    ESP_LOGI(TAG, "CS interrupt attached");
+  } else {
+    ESP_LOGE(TAG, "CS pin %d does not support interrupts!", cs_pin_);
+  }
+
+  if (clk_int >= 0) {
+    attachInterrupt(clk_int, isr_clk_wrapper, CHANGE);
+    ESP_LOGI(TAG, "CLK interrupt attached");
+  } else {
+    ESP_LOGE(TAG, "CLK pin %d does not support interrupts!", clk_pin_);
+  }
+
+  ESP_LOGI(TAG, "CIO TYPE1 initialized - waiting for data from spa controller");
 }
 
 void CIO_TYPE1::stop() {
@@ -200,6 +220,8 @@ void IRAM_ATTR CIO_TYPE1::eop_handler() {
 }
 
 void IRAM_ATTR CIO_TYPE1::isr_packet_handler() {
+  cs_interrupt_count_++;  // Debug counter
+
 #ifdef ESP8266
   if (GPI & (1 << cs_pin_)) {  // GPIO Input register
 #else
@@ -216,6 +238,8 @@ void IRAM_ATTR CIO_TYPE1::isr_packet_handler() {
 }
 
 void IRAM_ATTR CIO_TYPE1::isr_clk_handler() {
+  clk_interrupt_count_++;  // Debug counter
+
   if (!packet_transm_active_)
     return;
 

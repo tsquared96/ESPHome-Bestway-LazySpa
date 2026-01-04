@@ -77,6 +77,8 @@ class CIO_TYPE1 {
   bool is_new_packet_available() { return new_packet_available_; }
   uint32_t get_good_packets() { return good_packets_count_; }
   uint32_t get_bad_packets() { return bad_packets_count_; }
+  uint32_t get_cs_interrupts() { return cs_interrupt_count_; }
+  uint32_t get_clk_interrupts() { return clk_interrupt_count_; }
 
   // Button handling
   void set_button_code(uint16_t code) { button_code_ = code; }
@@ -122,6 +124,10 @@ class CIO_TYPE1 {
   CIOStates cio_states_;
   uint32_t good_packets_count_{0};
   uint32_t bad_packets_count_{0};
+
+  // Debug: interrupt counters
+  volatile uint32_t cs_interrupt_count_{0};
+  volatile uint32_t clk_interrupt_count_{0};
 
   // Model configuration
   bool has_jets_{false};

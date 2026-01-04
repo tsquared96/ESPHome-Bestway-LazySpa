@@ -289,12 +289,19 @@ void BestwaySpa::handle_6wire_type1_protocol_() {
   // Periodic diagnostic logging (every 5 seconds)
   static uint32_t last_diag_time = 0;
   static uint32_t last_good_packets = 0;
+  static uint32_t last_cs_int = 0;
+  static uint32_t last_clk_int = 0;
   if (millis() - last_diag_time > 5000) {
     uint32_t good = cio_type1_.get_good_packets();
     uint32_t bad = cio_type1_.get_bad_packets();
-    ESP_LOGI(TAG, "CIO status: good=%u (+%u) bad=%u new_pkt=%d",
-             good, good - last_good_packets, bad, cio_type1_.is_new_packet_available());
+    uint32_t cs_int = cio_type1_.get_cs_interrupts();
+    uint32_t clk_int = cio_type1_.get_clk_interrupts();
+    ESP_LOGI(TAG, "CIO: pkts=%u(+%u) bad=%u | ISR: cs=%u(+%u) clk=%u(+%u)",
+             good, good - last_good_packets, bad,
+             cs_int, cs_int - last_cs_int, clk_int, clk_int - last_clk_int);
     last_good_packets = good;
+    last_cs_int = cs_int;
+    last_clk_int = clk_int;
     last_diag_time = millis();
   }
 
