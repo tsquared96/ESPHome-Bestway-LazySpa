@@ -98,11 +98,11 @@ _BASE_CLIMATE_SCHEMA = cv.Schema({
     cv.Optional(CONF_PROTOCOL_TYPE, default="4WIRE"): cv.enum(PROTOCOL_TYPES, upper=True),
     cv.Optional(CONF_MODEL, default="54154"): cv.enum(SPA_MODELS, upper=True),
 
-    # 6-wire pin configuration
-    cv.Optional(CONF_CLK_PIN): pins.gpio_output_pin_schema,
-    cv.Optional(CONF_DATA_PIN): pins.internal_gpio_pin_schema,
-    cv.Optional(CONF_CS_PIN): pins.gpio_output_pin_schema,
-    cv.Optional(CONF_AUDIO_PIN): pins.gpio_output_pin_schema,
+    # 6-wire pin configuration (all use internal GPIO for interrupt support)
+    cv.Optional(CONF_CLK_PIN): pins.internal_gpio_input_pin_schema,
+    cv.Optional(CONF_DATA_PIN): pins.internal_gpio_output_pin_schema,
+    cv.Optional(CONF_CS_PIN): pins.internal_gpio_input_pin_schema,
+    cv.Optional(CONF_AUDIO_PIN): pins.internal_gpio_output_pin_schema,
 
     # Temperature sensors
     cv.Optional(CONF_CURRENT_TEMPERATURE): sensor.sensor_schema(
