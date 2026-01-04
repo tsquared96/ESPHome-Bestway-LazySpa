@@ -688,6 +688,35 @@ void BestwaySpa::update_sensors_() {
   if (display_text_sensor_ != nullptr) {
     display_text_sensor_->publish_state(std::string(state_.display_chars));
   }
+
+  if (button_status_sensor_ != nullptr) {
+    // Convert button code to name
+    const char* btn_name = "UNKNOWN";
+    if (current_button_code_ == get_button_code_(NOBTN)) {
+      btn_name = "NOBTN";
+    } else if (current_button_code_ == get_button_code_(LOCK)) {
+      btn_name = "LOCK";
+    } else if (current_button_code_ == get_button_code_(TIMER)) {
+      btn_name = "TIMER";
+    } else if (current_button_code_ == get_button_code_(BUBBLES)) {
+      btn_name = "BUBBLES";
+    } else if (current_button_code_ == get_button_code_(UNIT)) {
+      btn_name = "UNIT";
+    } else if (current_button_code_ == get_button_code_(HEAT)) {
+      btn_name = "HEAT";
+    } else if (current_button_code_ == get_button_code_(PUMP)) {
+      btn_name = "PUMP";
+    } else if (current_button_code_ == get_button_code_(DOWN)) {
+      btn_name = "DOWN";
+    } else if (current_button_code_ == get_button_code_(UP)) {
+      btn_name = "UP";
+    } else if (current_button_code_ == get_button_code_(POWER)) {
+      btn_name = "POWER";
+    } else if (current_button_code_ == get_button_code_(HYDROJETS)) {
+      btn_name = "JETS";
+    }
+    button_status_sensor_->publish_state(btn_name);
+  }
 }
 
 // =============================================================================

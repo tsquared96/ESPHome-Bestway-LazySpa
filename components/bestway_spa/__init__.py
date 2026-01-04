@@ -82,6 +82,7 @@ CONF_POWER = "power"
 CONF_ERROR = "error"
 CONF_ERROR_TEXT = "error_text"
 CONF_DISPLAY_TEXT = "display_text"
+CONF_BUTTON_STATUS = "button_status"
 
 
 def validate_6wire_pins(config):
@@ -154,6 +155,7 @@ _BASE_CLIMATE_SCHEMA = cv.Schema({
     # Text sensors
     cv.Optional(CONF_ERROR_TEXT): text_sensor.text_sensor_schema(),
     cv.Optional(CONF_DISPLAY_TEXT): text_sensor.text_sensor_schema(),
+    cv.Optional(CONF_BUTTON_STATUS): text_sensor.text_sensor_schema(),
 })
 
 CONFIG_SCHEMA = cv.All(
@@ -252,6 +254,10 @@ async def to_code(config):
     if CONF_DISPLAY_TEXT in config:
         sens = await text_sensor.new_text_sensor(config[CONF_DISPLAY_TEXT])
         cg.add(var.set_display_text_sensor(sens))
+
+    if CONF_BUTTON_STATUS in config:
+        sens = await text_sensor.new_text_sensor(config[CONF_BUTTON_STATUS])
+        cg.add(var.set_button_status_sensor(sens))
 
 
 # =============================================================================

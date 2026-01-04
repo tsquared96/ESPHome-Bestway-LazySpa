@@ -183,6 +183,9 @@ climate:
     display_text:
       name: "${friendly_name} Display"
 
+    button_status:
+      name: "${friendly_name} Button Status"
+
 # =============================================================================
 # CONTROL SWITCHES
 # =============================================================================

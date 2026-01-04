@@ -250,6 +250,7 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   // Text sensors
   void set_error_text_sensor(text_sensor::TextSensor *sensor) { error_text_sensor_ = sensor; }
   void set_display_text_sensor(text_sensor::TextSensor *sensor) { display_text_sensor_ = sensor; }
+  void set_button_status_sensor(text_sensor::TextSensor *sensor) { button_status_sensor_ = sensor; }
 
   // Control methods (called by switches and automation)
   void set_power(bool state);
@@ -334,6 +335,7 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   binary_sensor::BinarySensor *error_sensor_{nullptr};
   text_sensor::TextSensor *error_text_sensor_{nullptr};
   text_sensor::TextSensor *display_text_sensor_{nullptr};
+  text_sensor::TextSensor *button_status_sensor_{nullptr};
 
   // Packet buffers
   std::vector<uint8_t> rx_buffer_;
