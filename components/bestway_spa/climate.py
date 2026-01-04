@@ -33,6 +33,7 @@ from . import (
 )
 
 DEPENDENCIES = ["uart"]
+AUTO_LOAD = ["sensor", "binary_sensor", "text_sensor"]
 
 
 def validate_6wire_pins(config):
