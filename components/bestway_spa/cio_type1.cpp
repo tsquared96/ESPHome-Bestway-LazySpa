@@ -294,8 +294,10 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
       }
 
       // Check if CIO is requesting button data
-      // When we receive 0x42 (DSP_CMD2_DATAREAD), we start sending button code
-      if (_current_byte == DSP_CMD2_DATAREAD_TYPE1) {
+      // Originally we looked for 0x42 command, but some spa variants don't use it.
+      // Instead, trigger button output after receiving byte 7 (after display data)
+      // This is when the CIO typically expects button response.
+      if (_byte_count == 8) {  // After byte 7 is stored (0-indexed)
         _data_is_output = true;
         _send_bit = 0;  // Start at bit 0, send all 16 bits
 
