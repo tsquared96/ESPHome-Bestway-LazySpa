@@ -5,8 +5,6 @@ from esphome.const import CONF_ID
 
 from .. import bestway_spa_ns, BestwaySpa, CONF_BESTWAY_SPA_ID
 
-DEPENDENCIES = ["bestway_spa"]
-
 # Switch class
 BestwaySpaSwitch = bestway_spa_ns.class_("BestwaySpaSwitch", switch.Switch, cg.Component)
 
