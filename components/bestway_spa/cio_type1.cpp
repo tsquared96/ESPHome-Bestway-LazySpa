@@ -105,10 +105,10 @@ void CioType1::setup(int cio_clk_pin, int cio_data_pin, int cio_cs_pin, int dsp_
 
   // --- DSP BUS PIN (output to pump controller) ---
 
-  // DSP Data - OUTPUT for button codes
+  // DSP Data - Keep as INPUT by default to allow physical display buttons to work
+  // Only switch to OUTPUT when actively sending button bits
   if (_dsp_data_pin >= 0) {
-    pinMode(_dsp_data_pin, OUTPUT);
-    digitalWrite(_dsp_data_pin, HIGH);  // Default high (NOBTN has high bits)
+    pinMode(_dsp_data_pin, INPUT);  // High-impedance allows pass-through
   }
 
   // Initialize button code to NOBTN
@@ -298,6 +298,11 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
       if (_current_byte == DSP_CMD2_DATAREAD_TYPE1) {
         _data_is_output = true;
         _send_bit = 0;  // Start at bit 0, send all 16 bits
+
+        // Switch DSP_DATA pin to OUTPUT mode for button transmission
+        if (_dsp_data_pin >= 0) {
+          pinMode(_dsp_data_pin, OUTPUT);
+        }
       }
 
       _current_byte = 0;
@@ -329,6 +334,11 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
       if (_send_bit >= 16) {
         _send_bit = 0;
         _data_is_output = false;  // Done sending button code
+
+        // Switch DSP_DATA pin back to INPUT for pass-through
+        if (_dsp_data_pin >= 0) {
+          pinMode(_dsp_data_pin, INPUT);
+        }
       }
     }
   }
