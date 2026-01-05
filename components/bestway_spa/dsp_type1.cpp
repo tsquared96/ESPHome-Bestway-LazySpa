@@ -280,55 +280,54 @@ void DspType1::handleStates(const SpaState& states, uint8_t brightness) {
   _payload[DGT2_IDX] = charTo7Seg_(states.display_chars[1]);
   _payload[DGT3_IDX] = charTo7Seg_(states.display_chars[2]);
 
-  // Set filler/command bytes (bytes 0, 2, 4, 6)
-  _payload[0] = 0xFE;
-  _payload[2] = 0xFE;
-  _payload[4] = 0xFE;
-  _payload[6] = 0xFE;
+  // Set command/filler bytes (bytes 0, 2, 4, 6) - per VA protocol these are 0x00
+  _payload[0] = 0x00;
+  _payload[2] = 0x00;
+  _payload[4] = 0x00;
+  _payload[6] = 0x00;
 
-  // Set status byte 7 (timer, lock, heater, bubbles LEDs)
+  // Set status byte 7 - using CIO protocol bit positions
+  // From cio_type1.h: LED_LOCK_TYPE1=0x04 (bit 2), LED_TIMER_TYPE1=0x02 (bit 1), LED_UNIT_F_TYPE1=0x01 (bit 0)
   uint8_t status1 = 0;
   if (states.timer_active) {
-    status1 |= (1 << TMR1_BIT);
-    status1 |= (1 << TMRBTNLED_BIT);
+    status1 |= 0x02;  // LED_TIMER_TYPE1
   }
   if (states.locked) {
-    status1 |= (1 << LCK_BIT);
+    status1 |= 0x04;  // LED_LOCK_TYPE1
   }
-  if (states.heater_red) {
-    status1 |= (1 << REDHTR_BIT);
+  if (!states.unit_celsius) {
+    status1 |= 0x01;  // LED_UNIT_F_TYPE1 (set when Fahrenheit)
   }
+  _payload[7] = status1;
+
+  // Filler byte 8 - per VA protocol this is 0x00
+  _payload[8] = 0x00;
+
+  // Set status byte 9 - using CIO protocol bit positions
+  // From cio_type1.h: HEATGRN=0x01, BUBBLES=0x02, PUMP=0x04, HEATRED=0x08, POWER=0x20, JETS=0x40
+  uint8_t status2 = 0;
   if (states.heater_green) {
-    status1 |= (1 << GRNHTR_BIT);
+    status2 |= 0x01;  // LED_HEATGRN_TYPE1
   }
   if (states.bubbles) {
-    status1 |= (1 << AIR_BIT);
+    status2 |= 0x02;  // LED_BUBBLES_TYPE1
   }
-  _payload[TMR1_IDX] = status1;
-
-  // Filler byte 8
-  _payload[8] = 0xFE;
-
-  // Set status byte 9 (filter, unit, power, jets)
-  uint8_t status2 = 0;
   if (states.filter_pump) {
-    status2 |= (1 << FLT_BIT);
+    status2 |= 0x04;  // LED_PUMP_TYPE1
   }
-  if (states.unit_celsius) {
-    status2 |= (1 << C_BIT);
-  } else {
-    status2 |= (1 << F_BIT);
+  if (states.heater_red) {
+    status2 |= 0x08;  // LED_HEATRED_TYPE1
   }
   if (states.power) {
-    status2 |= (1 << PWR_BIT);
+    status2 |= 0x20;  // LED_POWER_TYPE1
   }
   if (states.jets) {
-    status2 |= (1 << HJT_BIT);
+    status2 |= 0x40;  // LED_JETS_TYPE1
   }
-  _payload[FLT_IDX] = status2;
+  _payload[9] = status2;
 
-  // Filler byte 10
-  _payload[10] = 0xFE;
+  // Filler byte 10 - per VA protocol this is 0x00
+  _payload[10] = 0x00;
 
   // Upload to display
   uploadPayload_(brightness);

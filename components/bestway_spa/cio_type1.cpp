@@ -299,9 +299,9 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
       _byte_count++;
 
       // Check if CIO is requesting button data
-      // Trigger at byte position 3 (after command byte)
+      // Per VA: trigger when byte_count > 2 AND packet[2] == 0x42 (DSP_CMD2_DATAREAD)
       // Only send if we have an actual button to send (not NOBTN)
-      bool is_button_window = (_byte_count == 3);
+      bool is_button_window = (_byte_count == 3 && _packet[2] == DSP_CMD2_DATAREAD_TYPE1);
       bool has_button_to_send = (_button_code != 0x1B1B);
 
       if (is_button_window && has_button_to_send) {
