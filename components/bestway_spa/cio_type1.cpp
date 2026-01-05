@@ -79,12 +79,12 @@ void CioType1::setup(int cio_clk_pin, int cio_data_pin, int cio_cs_pin, int dsp_
   _cio_clk_pin = cio_clk_pin;
   _cio_data_pin = cio_data_pin;
   _cio_cs_pin = cio_cs_pin;
-  _dsp_data_pin = dsp_data_pin;
+  _dsp_data_pin = dsp_data_pin;  // Legacy - not used for button injection anymore
 
   // Set global instance for ISR access
   g_cio_type1_instance = this;
 
-  // --- CIO BUS PINS (input from pump controller) ---
+  // --- CIO BUS PINS ---
 
   // CIO Clock - INPUT
   if (_cio_clk_pin >= 0) {
@@ -92,7 +92,9 @@ void CioType1::setup(int cio_clk_pin, int cio_data_pin, int cio_cs_pin, int dsp_
     attachInterrupt(digitalPinToInterrupt(_cio_clk_pin), isr_clk_type1, CHANGE);
   }
 
-  // CIO Data - INPUT (read display data from pump controller)
+  // CIO Data - BIDIRECTIONAL (INPUT to read, OUTPUT to send button codes)
+  // Starts as INPUT to read display data from pump controller
+  // Switches to OUTPUT during button transmission windows
   if (_cio_data_pin >= 0) {
     pinMode(_cio_data_pin, INPUT);
   }
@@ -101,14 +103,6 @@ void CioType1::setup(int cio_clk_pin, int cio_data_pin, int cio_cs_pin, int dsp_
   if (_cio_cs_pin >= 0) {
     pinMode(_cio_cs_pin, INPUT);
     attachInterrupt(digitalPinToInterrupt(_cio_cs_pin), isr_cs_type1, CHANGE);
-  }
-
-  // --- DSP BUS PIN (output to pump controller) ---
-
-  // DSP Data - Keep as INPUT by default to allow physical display buttons to work
-  // Only switch to OUTPUT when actively sending button bits
-  if (_dsp_data_pin >= 0) {
-    pinMode(_dsp_data_pin, INPUT);  // High-impedance allows pass-through
   }
 
   // Initialize button code to NOBTN
@@ -222,9 +216,9 @@ void IRAM_ATTR CioType1::isr_packetHandler() {
     _packet_active = false;
     _data_is_output = false;
 
-    // Switch DSP_DATA pin back to INPUT for physical button pass-through
-    if (_dsp_data_pin >= 0) {
-      pinMode(_dsp_data_pin, INPUT);
+    // Switch CIO_DATA pin back to INPUT for reading next packet
+    if (_cio_data_pin >= 0) {
+      pinMode(_cio_data_pin, INPUT);
     }
 
     // Validate packet length (should be 11 bytes = 88 bits)
@@ -260,7 +254,11 @@ void IRAM_ATTR CioType1::isr_packetHandler() {
 // Based on VisualApproach isr_clkHandler
 //
 // Rising edge: Read data bit from CIO_DATA (LSB first)
-// Falling edge: Write button bit to DSP_DATA (when in output mode)
+// Falling edge: Write button bit to CIO_DATA (when in output mode)
+//
+// The CIO DATA line is bidirectional:
+// - INPUT mode: Read display data from pump controller
+// - OUTPUT mode: Send button codes back to pump controller
 // =============================================================================
 
 void IRAM_ATTR CioType1::isr_clkHandler() {
@@ -281,42 +279,38 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
 
   if (clk_high) {
     // ===================
-    // RISING EDGE: Read data from CIO
+    // RISING EDGE: Read data from CIO (when in input mode)
     // ===================
 
-    // Shift in bit (LSB first: >> 1 | bit << 7)
-    _current_byte = (_current_byte >> 1) | (data_bit << 7);
+    if (!_data_is_output) {
+      // Shift in bit (LSB first: >> 1 | bit << 7)
+      _current_byte = (_current_byte >> 1) | (data_bit << 7);
+    }
     _bit_count++;
 
     if (_bit_count == 8) {
       // Complete byte received
       _bit_count = 0;
 
-      // Store the byte
-      if (_byte_count < 11) {
+      // Store the byte (only if we were reading, not outputting)
+      if (!_data_is_output && _byte_count < 11) {
         _packet[_byte_count] = _current_byte;
-        _byte_count++;
       }
+      _byte_count++;
 
       // Check if CIO is requesting button data
-      // Original VisualApproach triggers on DSP_CMD2_DATAREAD (0x42)
-      // Some spa variants use 0xFE instead.
-      // Trigger ONCE per packet at position 3 (after storing byte 2 = command byte)
-      // This matches the original protocol timing.
+      // Trigger at byte position 3 (after command byte)
+      // Only send if we have an actual button to send (not NOBTN)
       bool is_button_window = (_byte_count == 3);
-      bool is_cmd_byte = (_current_byte == 0x42 || _current_byte == 0xFE);
-
-      // Only drive the line if we have an actual button to send (not NOBTN)
-      // This allows physical display buttons to pass through when ESP isn't pressing anything
       bool has_button_to_send = (_button_code != 0x1B1B);
 
       if (is_button_window && has_button_to_send) {
         _data_is_output = true;
-        _send_bit = 8;  // Start at bit 8, send bits 8-15 only (matching VisualApproach)
+        _send_bit = 8;  // Start at bit 8 (matching VisualApproach)
 
-        // Switch DSP_DATA pin to OUTPUT mode for button transmission
-        if (_dsp_data_pin >= 0) {
-          pinMode(_dsp_data_pin, OUTPUT);
+        // Switch CIO_DATA pin to OUTPUT mode for button transmission
+        if (_cio_data_pin >= 0) {
+          pinMode(_cio_data_pin, OUTPUT);
         }
       }
 
@@ -325,31 +319,29 @@ void IRAM_ATTR CioType1::isr_clkHandler() {
 
   } else {
     // ===================
-    // FALLING EDGE: Write button data to DSP_DATA
+    // FALLING EDGE: Write button data to CIO_DATA (when in output mode)
     // ===================
 
-    if (_data_is_output && _dsp_data_pin >= 0) {
-      // Send button code bit (matching VisualApproach: continuous cycling)
+    if (_data_is_output && _cio_data_pin >= 0) {
+      // Send button code bit (continuous cycling through all 16 bits)
       bool bit_val = (_button_code >> _send_bit) & 1;
 
 #ifdef ESP8266
       // Fast GPIO write using register access
       if (bit_val) {
-        WRITE_PERI_REG(PIN_OUT_SET, 1 << _dsp_data_pin);
+        WRITE_PERI_REG(PIN_OUT_SET, 1 << _cio_data_pin);
       } else {
-        WRITE_PERI_REG(PIN_OUT_CLEAR, 1 << _dsp_data_pin);
+        WRITE_PERI_REG(PIN_OUT_CLEAR, 1 << _cio_data_pin);
       }
 #else
-      digitalWrite(_dsp_data_pin, bit_val ? HIGH : LOW);
+      digitalWrite(_cio_data_pin, bit_val ? HIGH : LOW);
 #endif
 
       _send_bit++;
 
-      // Original VisualApproach: cycle continuously through all 16 bits
-      // _data_is_output stays true until CS goes high (packet end)
-      // Button bits wrap from 15 back to 0 for continuous transmission
+      // Cycle continuously through all 16 bits until CS goes high
       if (_send_bit > 15) {
-        _send_bit = 0;  // Wrap back to bit 0 (matches original: if(_send_bit > 15) _send_bit = 0)
+        _send_bit = 0;
       }
     }
   }
