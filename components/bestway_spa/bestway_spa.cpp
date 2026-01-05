@@ -13,6 +13,7 @@
 #include "bestway_spa.h"
 #include "cio_type1.h"
 #include "cio_type2.h"
+#include "dsp_type1.h"
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
 #include <Arduino.h>
@@ -41,8 +42,14 @@ static const uint32_t PACKET_TIMEOUT_MS = 100;
 static CioType1 cio_type1;
 static CioType2 cio_type2;
 
+// DSP handler instance (for physical display communication)
+static DspType1 dsp_type1;
+
 // Active protocol pointer (points to the appropriate handler)
 static bool is_type1 = true;
+
+// DSP enabled flag (requires separate DSP pins to be configured)
+static bool dsp_enabled = false;
 
 // =============================================================================
 // SETUP
@@ -111,11 +118,34 @@ void BestwaySpa::setup() {
     ESP_LOGI(TAG, "  DSP bus (output): DATA=%d", dsp_pin);
 
     // Audio pin (optional)
+    int audio_gpio = -1;
     if (audio_pin_ != nullptr) {
-      int audio_gpio = audio_pin_->get_pin();
+      audio_gpio = audio_pin_->get_pin();
       pinMode(audio_gpio, OUTPUT);
       digitalWrite(audio_gpio, LOW);
       ESP_LOGD(TAG, "Audio pin configured on GPIO%d", audio_gpio);
+    }
+
+    // Initialize DSP handler for physical display communication (if pins configured)
+    // This requires separate DSP bus pins (dsp_clk_pin, dsp_cs_pin) to be configured
+    int dsp_data_gpio = (dsp_data_pin_ != nullptr) ? dsp_data_pin_->get_pin() : -1;
+    int dsp_clk_gpio = (dsp_clk_pin_ != nullptr) ? dsp_clk_pin_->get_pin() : -1;
+    int dsp_cs_gpio = (dsp_cs_pin_ != nullptr) ? dsp_cs_pin_->get_pin() : -1;
+
+    if (dsp_data_gpio >= 0 && dsp_clk_gpio >= 0 && dsp_cs_gpio >= 0) {
+      // Full DSP bus configured - enable DSP communication with physical display
+      dsp_type1.setup(dsp_data_gpio, dsp_clk_gpio, dsp_cs_gpio, audio_gpio);
+      dsp_enabled = true;
+      ESP_LOGI(TAG, "DSP bus (physical display): DATA=%d CLK=%d CS=%d",
+               dsp_data_gpio, dsp_clk_gpio, dsp_cs_gpio);
+    } else if (dsp_data_gpio >= 0) {
+      // Only DSP_DATA configured - legacy mode (button transmission only)
+      dsp_enabled = false;
+      ESP_LOGW(TAG, "DSP bus not fully configured - physical display disabled");
+      ESP_LOGW(TAG, "Add 'dsp_clk_pin' and 'dsp_cs_pin' to enable physical display communication");
+    } else {
+      dsp_enabled = false;
+      ESP_LOGW(TAG, "DSP pins not configured - physical display and button control disabled!");
     }
   }
 
@@ -196,12 +226,20 @@ void BestwaySpa::loop() {
       uint32_t cs_delta = cs_count - last_cs_count_;
       uint32_t clk_delta = clk_count - last_clk_count_;
 
-      ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | ISR: cs=%lu(+%lu) clk=%lu(+%lu) | Btn:0x%04X",
-               (unsigned long)good_packets_, (unsigned long)pkt_delta,
-               (unsigned long)bad_packets,
-               (unsigned long)cs_count, (unsigned long)cs_delta,
-               (unsigned long)clk_count, (unsigned long)clk_delta,
-               current_button_code_);
+      if (dsp_enabled) {
+        ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | DSP: pkts=%lu | Btn:0x%04X",
+                 (unsigned long)good_packets_, (unsigned long)pkt_delta,
+                 (unsigned long)bad_packets,
+                 (unsigned long)dsp_type1.getGoodPackets(),
+                 current_button_code_);
+      } else {
+        ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | ISR: cs=%lu(+%lu) clk=%lu(+%lu) | Btn:0x%04X",
+                 (unsigned long)good_packets_, (unsigned long)pkt_delta,
+                 (unsigned long)bad_packets,
+                 (unsigned long)cs_count, (unsigned long)cs_delta,
+                 (unsigned long)clk_count, (unsigned long)clk_delta,
+                 current_button_code_);
+      }
 
       last_cs_count_ = cs_count;
       last_clk_count_ = clk_count;
@@ -269,20 +307,33 @@ void BestwaySpa::dump_config() {
 
   if (protocol_type_ != PROTOCOL_4WIRE) {
     ESP_LOGCONFIG(TAG, "  MITM Dual-Bus Architecture:");
+    ESP_LOGCONFIG(TAG, "  CIO Bus (input from pump controller):");
     if (cio_clk_pin_ != nullptr)
-      ESP_LOGCONFIG(TAG, "    CIO CLK Pin (input): GPIO%d", cio_clk_pin_->get_pin());
+      ESP_LOGCONFIG(TAG, "    CLK Pin: GPIO%d", cio_clk_pin_->get_pin());
     if (cio_data_pin_ != nullptr)
-      ESP_LOGCONFIG(TAG, "    CIO DATA Pin (input): GPIO%d", cio_data_pin_->get_pin());
+      ESP_LOGCONFIG(TAG, "    DATA Pin: GPIO%d", cio_data_pin_->get_pin());
     if (cio_cs_pin_ != nullptr)
-      ESP_LOGCONFIG(TAG, "    CIO CS Pin (input): GPIO%d", cio_cs_pin_->get_pin());
-    if (dsp_data_pin_ != nullptr)
-      ESP_LOGCONFIG(TAG, "    DSP DATA Pin (output): GPIO%d", dsp_data_pin_->get_pin());
-    else
-      ESP_LOGCONFIG(TAG, "    DSP DATA Pin: NOT CONFIGURED (button control disabled!)");
+      ESP_LOGCONFIG(TAG, "    CS Pin: GPIO%d", cio_cs_pin_->get_pin());
+
+    ESP_LOGCONFIG(TAG, "  DSP Bus (output to physical display):");
+    if (dsp_enabled) {
+      if (dsp_data_pin_ != nullptr)
+        ESP_LOGCONFIG(TAG, "    DATA Pin: GPIO%d", dsp_data_pin_->get_pin());
+      if (dsp_clk_pin_ != nullptr)
+        ESP_LOGCONFIG(TAG, "    CLK Pin: GPIO%d", dsp_clk_pin_->get_pin());
+      if (dsp_cs_pin_ != nullptr)
+        ESP_LOGCONFIG(TAG, "    CS Pin: GPIO%d", dsp_cs_pin_->get_pin());
+      ESP_LOGCONFIG(TAG, "    Status: ENABLED (physical display active)");
+    } else {
+      ESP_LOGCONFIG(TAG, "    Status: DISABLED (add dsp_data_pin, dsp_clk_pin, dsp_cs_pin)");
+    }
 
     if (is_type1) {
       ESP_LOGCONFIG(TAG, "  CIO Good packets: %lu", (unsigned long)cio_type1.getGoodPackets());
       ESP_LOGCONFIG(TAG, "  CIO Bad packets: %lu", (unsigned long)cio_type1.getBadPackets());
+      if (dsp_enabled) {
+        ESP_LOGCONFIG(TAG, "  DSP Good packets: %lu", (unsigned long)dsp_type1.getGoodPackets());
+      }
     } else {
       ESP_LOGCONFIG(TAG, "  CIO Good packets: %lu", (unsigned long)cio_type2.getGoodPackets());
       ESP_LOGCONFIG(TAG, "  CIO Bad packets: %lu", (unsigned long)cio_type2.getBadPackets());
@@ -461,13 +512,23 @@ void BestwaySpa::send_4wire_response_() {
 }
 
 // =============================================================================
-// 6-WIRE PROTOCOL HANDLER - Uses modular CIO classes
+// 6-WIRE PROTOCOL HANDLER - Uses modular CIO and DSP classes
+// Based on VA firmware BWC::loop():
+//   cio->updateStates();                // Read from CIO (done via ISR)
+//   dsp->dsp_states = cio->cio_states;  // Copy states
+//   dsp->handleStates();                // Send to DSP (physical display)
+//   dsp->updateToggles();               // Read buttons from DSP
+//   cio->cio_toggles = dsp->dsp_toggles;// Copy toggles
+//   cio->handleToggles();               // Send to CIO (pump controller)
 // =============================================================================
 
 void BestwaySpa::handle_6wire_protocol_() {
   uint8_t packet[16];
   bool has_packet = false;
 
+  // =========================================================================
+  // STEP 1: cio->updateStates() - Read from CIO (done via ISR in cio_type1.cpp)
+  // =========================================================================
   // Check appropriate CIO handler for new packets
   if (is_type1) {
     if (cio_type1.isPacketReady()) {
@@ -489,6 +550,39 @@ void BestwaySpa::handle_6wire_protocol_() {
     parse_6wire_cio_packet_(packet);
     good_packets_++;
   }
+
+  // =========================================================================
+  // STEP 2 & 3: dsp->handleStates() - Forward display states to physical display
+  // =========================================================================
+  if (dsp_enabled && is_type1) {
+    // Send current state to physical display at ~20Hz
+    dsp_type1.handleStates(state_, state_.brightness);
+  }
+
+  // =========================================================================
+  // STEP 4: dsp->updateToggles() - Read button presses from physical display
+  // =========================================================================
+  if (dsp_enabled && is_type1) {
+    Buttons button = dsp_type1.updateToggles();
+
+    // If physical button was pressed, queue it for transmission to CIO
+    if (button != NOBTN) {
+      ESP_LOGI(TAG, "Physical display button: %d", button);
+
+      // Check if button is enabled (can be disabled via HA)
+      if (is_button_enabled(button)) {
+        queue_button_(button);
+      } else {
+        ESP_LOGI(TAG, "Button %d disabled, ignoring", button);
+      }
+    }
+  }
+
+  // =========================================================================
+  // STEP 5 & 6: cio->handleToggles() - Send button code to CIO
+  // This is done in process_button_queue_() which sets current_button_code_
+  // The ISR in cio_type1.cpp then transmits this code during button windows
+  // =========================================================================
 }
 
 void BestwaySpa::parse_6wire_cio_packet_(const uint8_t *packet) {

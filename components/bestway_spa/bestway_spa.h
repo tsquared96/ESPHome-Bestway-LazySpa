@@ -225,8 +225,10 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   void set_cio_data_pin(InternalGPIOPin *pin) { cio_data_pin_ = pin; }
   void set_cio_clk_pin(InternalGPIOPin *pin) { cio_clk_pin_ = pin; }
   void set_cio_cs_pin(InternalGPIOPin *pin) { cio_cs_pin_ = pin; }
-  // DSP bus pins (from ESP to pump controller - output)
+  // DSP bus pins (from ESP to physical display panel - output)
   void set_dsp_data_pin(InternalGPIOPin *pin) { dsp_data_pin_ = pin; }
+  void set_dsp_clk_pin(InternalGPIOPin *pin) { dsp_clk_pin_ = pin; }
+  void set_dsp_cs_pin(InternalGPIOPin *pin) { dsp_cs_pin_ = pin; }
   void set_audio_pin(InternalGPIOPin *pin) { audio_pin_ = pin; }
 
   // Legacy single-bus setters (for backwards compatibility)
@@ -319,8 +321,10 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   InternalGPIOPin *cio_clk_pin_{nullptr};
   InternalGPIOPin *cio_data_pin_{nullptr};
   InternalGPIOPin *cio_cs_pin_{nullptr};
-  // DSP bus (output to pump controller)
+  // DSP bus (output to physical display panel)
   InternalGPIOPin *dsp_data_pin_{nullptr};
+  InternalGPIOPin *dsp_clk_pin_{nullptr};
+  InternalGPIOPin *dsp_cs_pin_{nullptr};
   InternalGPIOPin *audio_pin_{nullptr};
 
   // State

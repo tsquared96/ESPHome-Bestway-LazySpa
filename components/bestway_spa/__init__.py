@@ -64,8 +64,10 @@ CONF_MODEL = "model"
 CONF_CIO_CLK_PIN = "cio_clk_pin"
 CONF_CIO_DATA_PIN = "cio_data_pin"
 CONF_CIO_CS_PIN = "cio_cs_pin"
-# DSP bus pins (output to pump controller)
+# DSP bus pins (to physical display panel)
 CONF_DSP_DATA_PIN = "dsp_data_pin"
+CONF_DSP_CLK_PIN = "dsp_clk_pin"
+CONF_DSP_CS_PIN = "dsp_cs_pin"
 CONF_AUDIO_PIN = "audio_pin"
 # Legacy pin names (for backwards compatibility)
 CONF_CLK_PIN = "clk_pin"
@@ -123,8 +125,10 @@ _BASE_CLIMATE_SCHEMA = cv.Schema({
     cv.Optional(CONF_CIO_CLK_PIN): pins.internal_gpio_input_pin_schema,
     cv.Optional(CONF_CIO_DATA_PIN): pins.internal_gpio_input_pin_schema,
     cv.Optional(CONF_CIO_CS_PIN): pins.internal_gpio_input_pin_schema,
-    # DSP bus pins (output to pump controller)
+    # DSP bus pins (to physical display panel)
     cv.Optional(CONF_DSP_DATA_PIN): pins.internal_gpio_output_pin_schema,
+    cv.Optional(CONF_DSP_CLK_PIN): pins.internal_gpio_output_pin_schema,
+    cv.Optional(CONF_DSP_CS_PIN): pins.internal_gpio_output_pin_schema,
     cv.Optional(CONF_AUDIO_PIN): pins.internal_gpio_output_pin_schema,
     # Legacy pin names (for backwards compatibility)
     cv.Optional(CONF_CLK_PIN): pins.internal_gpio_input_pin_schema,
@@ -201,10 +205,18 @@ async def to_code(config):
         pin = await cg.gpio_pin_expression(config[CONF_CS_PIN])
         cg.add(var.set_cio_cs_pin(pin))
 
-    # DSP bus pins (output to pump controller)
+    # DSP bus pins (to physical display panel)
     if CONF_DSP_DATA_PIN in config:
         pin = await cg.gpio_pin_expression(config[CONF_DSP_DATA_PIN])
         cg.add(var.set_dsp_data_pin(pin))
+
+    if CONF_DSP_CLK_PIN in config:
+        pin = await cg.gpio_pin_expression(config[CONF_DSP_CLK_PIN])
+        cg.add(var.set_dsp_clk_pin(pin))
+
+    if CONF_DSP_CS_PIN in config:
+        pin = await cg.gpio_pin_expression(config[CONF_DSP_CS_PIN])
+        cg.add(var.set_dsp_cs_pin(pin))
 
     if CONF_AUDIO_PIN in config:
         pin = await cg.gpio_pin_expression(config[CONF_AUDIO_PIN])
