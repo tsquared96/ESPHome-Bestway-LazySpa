@@ -404,28 +404,31 @@ void CioType1::parsePacket(const uint8_t* packet,
     }
   }
 
-  // Parse status byte 7 (timer, lock, unit)
+  // Parse status byte 7 - from VA: lock, heater_red, heater_green, bubbles
+  // TMR2=bit1, TMR1=bit2, LCK=bit3, TMRBTNLED=bit4, REDHTR=bit5, GRNHTR=bit6, AIR=bit7
   uint8_t status1 = packet[7];
   if (locked != nullptr) {
     *locked = (status1 & LED_LOCK_TYPE1) != 0;
   }
-  if (unit_celsius != nullptr) {
-    *unit_celsius = (status1 & LED_UNIT_F_TYPE1) == 0;  // 0 = Celsius
+  if (heater_red != nullptr) {
+    *heater_red = (status1 & LED_HEATRED_TYPE1) != 0;
   }
-
-  // Parse status byte 9 (heat, air, filter, power, jets)
-  uint8_t status2 = packet[9];
   if (heater_green != nullptr) {
-    *heater_green = (status2 & LED_HEATGRN_TYPE1) != 0;
+    *heater_green = (status1 & LED_HEATGRN_TYPE1) != 0;
   }
   if (bubbles != nullptr) {
-    *bubbles = (status2 & LED_BUBBLES_TYPE1) != 0;
+    *bubbles = (status1 & LED_BUBBLES_TYPE1) != 0;
   }
+
+  // Parse status byte 9 - from VA: pump, unit, power, jets
+  // FLT=bit1, C=bit2, F=bit3, PWR=bit4, HJT=bit5
+  uint8_t status2 = packet[9];
   if (pump != nullptr) {
     *pump = (status2 & LED_PUMP_TYPE1) != 0;
   }
-  if (heater_red != nullptr) {
-    *heater_red = (status2 & LED_HEATRED_TYPE1) != 0;
+  if (unit_celsius != nullptr) {
+    // Check C bit (bit 2) - if set, Celsius; else check F bit
+    *unit_celsius = (status2 & LED_UNIT_C_TYPE1) != 0;
   }
   if (power != nullptr) {
     *power = (status2 & LED_POWER_TYPE1) != 0;

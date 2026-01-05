@@ -227,32 +227,41 @@ void DspType1::uploadPayload_(uint8_t brightness) {
   }
 
   // Calculate brightness command (0-8 levels)
-  uint8_t dim_cmd = DSP_DIM_BASE;
+  uint8_t enableLED = 0;
   if (brightness > 0) {
-    dim_cmd |= DSP_DIM_ON | ((brightness - 1) & 0x07);
+    enableLED = DSP_DIM_ON;
+    brightness -= 1;
   }
+  uint8_t dim_cmd = DSP_DIM_BASE | enableLED | (brightness & 0x07);
 
-  // CS low to start transmission
+  // VA sends 4 SEPARATE packets with CS toggling between each:
+
+  // Packet 1: Command 1 (mode)
+  delayMicroseconds(30);
   digitalWrite(_cs_pin, LOW);
-  delayMicroseconds(DSP_BIT_DELAY_US * 2);
+  sendBits_(DSP_CMD1_MODE6_11_7_P05504, 8);  // Use P05504 variant per VA
+  digitalWrite(_cs_pin, HIGH);
 
-  // Send command byte 1 (mode)
-  sendBits_(DSP_CMD1_MODE6_11_7, 8);
-
-  // Send command byte 2 (data write)
+  // Packet 2: Command 2 (data write)
+  delayMicroseconds(50);
+  digitalWrite(_cs_pin, LOW);
   sendBits_(DSP_CMD2_DATAWRITE, 8);
+  digitalWrite(_cs_pin, HIGH);
 
-  // Send 11 payload bytes
+  // Packet 3: 11 payload bytes
+  delayMicroseconds(50);
+  digitalWrite(_cs_pin, LOW);
   for (int i = 0; i < 11; i++) {
     sendBits_(_payload[i], 8);
   }
-
-  // Send brightness/dimming command
-  sendBits_(dim_cmd, 8);
-
-  // CS high to end transmission
   digitalWrite(_cs_pin, HIGH);
-  delayMicroseconds(DSP_BIT_DELAY_US * 2);
+
+  // Packet 4: Brightness/dimming
+  delayMicroseconds(50);
+  digitalWrite(_cs_pin, LOW);
+  sendBits_(dim_cmd, 8);
+  digitalWrite(_cs_pin, HIGH);
+  delayMicroseconds(50);
 }
 
 // =============================================================================
@@ -286,43 +295,47 @@ void DspType1::handleStates(const SpaState& states, uint8_t brightness) {
   _payload[4] = 0x00;
   _payload[6] = 0x00;
 
-  // Set status byte 7 - using CIO protocol bit positions
-  // From cio_type1.h: LED_LOCK_TYPE1=0x04 (bit 2), LED_TIMER_TYPE1=0x02 (bit 1), LED_UNIT_F_TYPE1=0x01 (bit 0)
+  // Set status byte 7 - VA bit positions:
+  // TMR2=bit1, TMR1=bit2, LCK=bit3, TMRBTNLED=bit4, REDHTR=bit5, GRNHTR=bit6, AIR=bit7
   uint8_t status1 = 0;
   if (states.timer_active) {
-    status1 |= 0x02;  // LED_TIMER_TYPE1
+    status1 |= (1 << 1);  // TMR2_BIT
+    status1 |= (1 << 2);  // TMR1_BIT
+    status1 |= (1 << 4);  // TMRBTNLED_BIT
   }
   if (states.locked) {
-    status1 |= 0x04;  // LED_LOCK_TYPE1
+    status1 |= (1 << 3);  // LCK_BIT
   }
-  if (!states.unit_celsius) {
-    status1 |= 0x01;  // LED_UNIT_F_TYPE1 (set when Fahrenheit)
+  if (states.heater_red) {
+    status1 |= (1 << 5);  // REDHTR_BIT
+  }
+  if (states.heater_green) {
+    status1 |= (1 << 6);  // GRNHTR_BIT
+  }
+  if (states.bubbles) {
+    status1 |= (1 << 7);  // AIR_BIT
   }
   _payload[7] = status1;
 
   // Filler byte 8 - per VA protocol this is 0x00
   _payload[8] = 0x00;
 
-  // Set status byte 9 - using CIO protocol bit positions
-  // From cio_type1.h: HEATGRN=0x01, BUBBLES=0x02, PUMP=0x04, HEATRED=0x08, POWER=0x20, JETS=0x40
+  // Set status byte 9 - VA bit positions:
+  // FLT=bit1, C=bit2, F=bit3, PWR=bit4, HJT=bit5
   uint8_t status2 = 0;
-  if (states.heater_green) {
-    status2 |= 0x01;  // LED_HEATGRN_TYPE1
-  }
-  if (states.bubbles) {
-    status2 |= 0x02;  // LED_BUBBLES_TYPE1
-  }
   if (states.filter_pump) {
-    status2 |= 0x04;  // LED_PUMP_TYPE1
+    status2 |= (1 << 1);  // FLT_BIT
   }
-  if (states.heater_red) {
-    status2 |= 0x08;  // LED_HEATRED_TYPE1
+  if (states.unit_celsius) {
+    status2 |= (1 << 2);  // C_BIT
+  } else {
+    status2 |= (1 << 3);  // F_BIT
   }
   if (states.power) {
-    status2 |= 0x20;  // LED_POWER_TYPE1
+    status2 |= (1 << 4);  // PWR_BIT
   }
   if (states.jets) {
-    status2 |= 0x40;  // LED_JETS_TYPE1
+    status2 |= (1 << 5);  // HJT_BIT
   }
   _payload[9] = status2;
 

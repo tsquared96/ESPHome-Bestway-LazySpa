@@ -49,18 +49,23 @@ static const uint8_t CIO_ACK2_TYPE1 = 0x00;
 // Byte 9: LED/status byte 2 (heat, air, filter, power, jets)
 // Byte 10: (unknown)
 
-// LED bit masks for status byte 7 (TYPE1)
-static const uint8_t LED_LOCK_TYPE1    = 0x04;
-static const uint8_t LED_TIMER_TYPE1   = 0x02;
-static const uint8_t LED_UNIT_F_TYPE1  = 0x01;  // 0=Celsius, 1=Fahrenheit
+// LED bit masks for status byte 7 (TYPE1) - from VA CIO_TYPE1.h
+// TMR2=bit1, TMR1=bit2, LCK=bit3, TMRBTNLED=bit4, REDHTR=bit5, GRNHTR=bit6, AIR=bit7
+static const uint8_t LED_TMR2_TYPE1     = 0x02;  // bit 1 - Timer LED 2
+static const uint8_t LED_TMR1_TYPE1     = 0x04;  // bit 2 - Timer LED 1
+static const uint8_t LED_LOCK_TYPE1     = 0x08;  // bit 3 - Lock
+static const uint8_t LED_TMRBTN_TYPE1   = 0x10;  // bit 4 - Timer button LED
+static const uint8_t LED_HEATRED_TYPE1  = 0x20;  // bit 5 - Heating active (red)
+static const uint8_t LED_HEATGRN_TYPE1  = 0x40;  // bit 6 - Heat standby (green)
+static const uint8_t LED_BUBBLES_TYPE1  = 0x80;  // bit 7 - Air/bubbles
 
-// LED bit masks for status byte 9 (TYPE1)
-static const uint8_t LED_HEATGRN_TYPE1  = 0x01;  // Heat standby (green)
-static const uint8_t LED_BUBBLES_TYPE1  = 0x02;  // Air/bubbles
-static const uint8_t LED_PUMP_TYPE1     = 0x04;  // Filter pump
-static const uint8_t LED_HEATRED_TYPE1  = 0x08;  // Heating active (red)
-static const uint8_t LED_POWER_TYPE1    = 0x20;  // Power on
-static const uint8_t LED_JETS_TYPE1     = 0x40;  // HydroJets (if available)
+// LED bit masks for status byte 9 (TYPE1) - from VA CIO_TYPE1.h
+// FLT=bit1, C=bit2, F=bit3, PWR=bit4, HJT=bit5
+static const uint8_t LED_PUMP_TYPE1     = 0x02;  // bit 1 - Filter pump
+static const uint8_t LED_UNIT_C_TYPE1   = 0x04;  // bit 2 - Celsius
+static const uint8_t LED_UNIT_F_TYPE1   = 0x08;  // bit 3 - Fahrenheit
+static const uint8_t LED_POWER_TYPE1    = 0x10;  // bit 4 - Power on
+static const uint8_t LED_JETS_TYPE1     = 0x20;  // bit 5 - HydroJets
 
 // 7-segment character codes for TYPE1 (38 characters: 0-9, A-Z, space, dash)
 static const uint8_t CHARCODES_TYPE1_DISP[] = {

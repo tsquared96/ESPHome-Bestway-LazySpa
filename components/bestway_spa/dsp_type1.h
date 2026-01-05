@@ -22,10 +22,10 @@
 namespace esphome {
 namespace bestway_spa {
 
-// DSP Commands
+// DSP Commands - from VA firmware
 static const uint8_t DSP_CMD1_MODE6_11_7 = 0x01;
 static const uint8_t DSP_CMD1_MODE6_11_7_P05504 = 0x05;
-static const uint8_t DSP_CMD2_DATAWRITE = 0x00;
+static const uint8_t DSP_CMD2_DATAWRITE = 0x40;  // VA uses 0x40, NOT 0x00!
 static const uint8_t DSP_CMD2_DATAREAD = 0x42;
 
 // Brightness
