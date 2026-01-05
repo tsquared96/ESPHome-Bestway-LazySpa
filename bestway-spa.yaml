@@ -61,11 +61,11 @@ uart:
 # =============================================================================
 # Custom Component
 # =============================================================================
+# Use local path - copy the components/bestway_spa folder to your ESPHome config
 external_components:
   - source:
-      type: git
-      url: https://github.com/tsquared96/ESPHome-Bestway-LazySpa
-      ref: claude/fix-spa-controls-pbVlc
+      type: local
+      path: components
     components: [ bestway_spa ]
 
 # =============================================================================
