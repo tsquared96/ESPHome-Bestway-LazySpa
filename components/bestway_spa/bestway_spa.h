@@ -286,8 +286,7 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   void handle_4wire_protocol_();
   void handle_6wire_protocol_();  // Interrupt-driven 6-wire handler
 
-  // 6-wire packet handling (interrupt-driven)
-  void parse_6wire_cio_packet_(const uint8_t *packet);
+  // 6-wire packet handling now done by VA's updateStates()
 
   // 4-wire packet handling
   void parse_4wire_packet_(const std::vector<uint8_t> &packet);
@@ -304,8 +303,7 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   void process_button_queue_();
   uint16_t get_button_code_(Buttons button);
 
-  // Character decoding
-  char decode_7segment_(uint8_t segments, bool is_type1);
+  // Character decoding now done by VA's _getChar() method
 
   // Utilities
   float celsius_to_fahrenheit_(float c) { return c * 9.0f / 5.0f + 32.0f; }

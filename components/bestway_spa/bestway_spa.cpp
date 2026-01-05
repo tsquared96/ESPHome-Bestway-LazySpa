@@ -11,9 +11,9 @@
  */
 
 #include "bestway_spa.h"
-#include "cio_type1.h"
-#include "cio_type2.h"
-#include "dsp_type1.h"
+// Use VA source files for 6-wire TYPE1 protocol
+#include "va/CIO_TYPE1.h"
+#include "va/DSP_TYPE1.h"
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
 #include <Arduino.h>
@@ -35,17 +35,16 @@ static const uint32_t STATS_INTERVAL_MS = 5000;
 static const uint32_t PACKET_TIMEOUT_MS = 100;
 
 // =============================================================================
-// STATIC INSTANCES FOR 6-WIRE PROTOCOLS
+// STATIC INSTANCES FOR 6-WIRE PROTOCOLS (using VA source files)
 // =============================================================================
 
-// CIO handler instances (one of these will be used based on protocol)
-static CioType1 cio_type1;
-static CioType2 cio_type2;
+// CIO handler instance - using VA PRE2021 implementation
+static bestway_va::CIO_PRE2021 va_cio;
 
-// DSP handler instance (for physical display communication)
-static DspType1 dsp_type1;
+// DSP handler instance - using VA PRE2021 implementation
+static bestway_va::DSP_PRE2021 va_dsp;
 
-// Active protocol pointer (points to the appropriate handler)
+// Active protocol type
 static bool is_type1 = true;
 
 // DSP enabled flag (requires separate DSP pins to be configured)
@@ -93,30 +92,6 @@ void BestwaySpa::setup() {
       ESP_LOGW(TAG, "Add 'dsp_data_pin' to your YAML config for button transmission");
     }
 
-    // Select and initialize the appropriate CIO handler based on protocol type
-    if (protocol_type_ == PROTOCOL_6WIRE_T1) {
-      is_type1 = true;
-      cio_type1.setup(clk_pin, data_pin, cs_pin, dsp_pin);
-
-      // Set initial button code to NOBTN
-      uint16_t nobtn = get_button_code_(NOBTN);
-      cio_type1.setButtonCode(nobtn);
-
-      ESP_LOGI(TAG, "6-wire TYPE1 protocol initialized (PRE2021/P05504)");
-    } else {
-      is_type1 = false;
-      cio_type2.setup(clk_pin, data_pin, cs_pin, dsp_pin);
-
-      // Set initial button code to NOBTN
-      uint16_t nobtn = get_button_code_(NOBTN);
-      cio_type2.setButtonCode(nobtn);
-
-      ESP_LOGI(TAG, "6-wire TYPE2 protocol initialized (54149E)");
-    }
-
-    ESP_LOGI(TAG, "  CIO bus (input):  CLK=%d, DATA=%d, CS=%d", clk_pin, data_pin, cs_pin);
-    ESP_LOGI(TAG, "  DSP bus (output): DATA=%d", dsp_pin);
-
     // Audio pin (optional)
     int audio_gpio = -1;
     if (audio_pin_ != nullptr) {
@@ -126,26 +101,40 @@ void BestwaySpa::setup() {
       ESP_LOGD(TAG, "Audio pin configured on GPIO%d", audio_gpio);
     }
 
+    // Initialize CIO handler using VA source (reads from pump controller)
+    // VA CIO_TYPE1::setup(data_pin, clk_pin, cs_pin)
+    if (protocol_type_ == PROTOCOL_6WIRE_T1) {
+      is_type1 = true;
+      va_cio.setup(data_pin, clk_pin, cs_pin);
+
+      // Set initial button code to NOBTN
+      va_cio.setButtonCode(va_cio.getButtonCode(bestway_va::NOBTN));
+
+      ESP_LOGI(TAG, "6-wire TYPE1 protocol initialized (VA source - PRE2021)");
+    } else {
+      is_type1 = false;
+      // TYPE2 not yet implemented in VA files
+      ESP_LOGW(TAG, "TYPE2 protocol not yet implemented in VA files");
+    }
+
+    ESP_LOGI(TAG, "  CIO bus (input):  DATA=%d CLK=%d CS=%d", data_pin, clk_pin, cs_pin);
+
     // Initialize DSP handler for physical display communication (if pins configured)
-    // This requires separate DSP bus pins (dsp_clk_pin, dsp_cs_pin) to be configured
     int dsp_data_gpio = (dsp_data_pin_ != nullptr) ? dsp_data_pin_->get_pin() : -1;
     int dsp_clk_gpio = (dsp_clk_pin_ != nullptr) ? dsp_clk_pin_->get_pin() : -1;
     int dsp_cs_gpio = (dsp_cs_pin_ != nullptr) ? dsp_cs_pin_->get_pin() : -1;
 
     if (dsp_data_gpio >= 0 && dsp_clk_gpio >= 0 && dsp_cs_gpio >= 0) {
       // Full DSP bus configured - enable DSP communication with physical display
-      dsp_type1.setup(dsp_data_gpio, dsp_clk_gpio, dsp_cs_gpio, audio_gpio);
+      // VA DSP_TYPE1::setup(data_pin, clk_pin, cs_pin, audio_pin)
+      va_dsp.setup(dsp_data_gpio, dsp_clk_gpio, dsp_cs_gpio, audio_gpio);
       dsp_enabled = true;
       ESP_LOGI(TAG, "DSP bus (physical display): DATA=%d CLK=%d CS=%d",
                dsp_data_gpio, dsp_clk_gpio, dsp_cs_gpio);
-    } else if (dsp_data_gpio >= 0) {
-      // Only DSP_DATA configured - legacy mode (button transmission only)
-      dsp_enabled = false;
-      ESP_LOGW(TAG, "DSP bus not fully configured - physical display disabled");
-      ESP_LOGW(TAG, "Add 'dsp_clk_pin' and 'dsp_cs_pin' to enable physical display communication");
     } else {
       dsp_enabled = false;
-      ESP_LOGW(TAG, "DSP pins not configured - physical display and button control disabled!");
+      ESP_LOGW(TAG, "DSP pins not configured - physical display disabled!");
+      ESP_LOGW(TAG, "Add dsp_data_pin, dsp_clk_pin, dsp_cs_pin for display");
     }
   }
 
@@ -184,12 +173,11 @@ void BestwaySpa::loop() {
   if (protocol_type_ != PROTOCOL_4WIRE) {
     process_button_queue_();
 
-    // Update the button code in the active CIO handler
+    // Update the button code in the active CIO handler (VA classes)
     if (is_type1) {
-      cio_type1.setButtonCode(current_button_code_);
-    } else {
-      cio_type2.setButtonCode(current_button_code_);
+      va_cio.setButtonCode(current_button_code_);
     }
+    // TYPE2 not yet implemented
   }
 
   // Handle toggle requests from HA
@@ -209,41 +197,24 @@ void BestwaySpa::loop() {
 
   // Log statistics periodically
   if (now - last_stats_time_ > STATS_INTERVAL_MS) {
-    if (protocol_type_ != PROTOCOL_4WIRE) {
-      uint32_t pkt_delta = good_packets_ - last_pkt_count_;
-      uint32_t bad_packets, cs_count, clk_count;
-
-      if (is_type1) {
-        bad_packets = cio_type1.getBadPackets();
-        cs_count = cio_type1.getCsCount();
-        clk_count = cio_type1.getClkCount();
-      } else {
-        bad_packets = cio_type2.getBadPackets();
-        cs_count = cio_type2.getCsCount();
-        clk_count = cio_type2.getClkCount();
-      }
-
-      uint32_t cs_delta = cs_count - last_cs_count_;
-      uint32_t clk_delta = clk_count - last_clk_count_;
+    if (protocol_type_ != PROTOCOL_4WIRE && is_type1) {
+      uint32_t pkt_delta = va_cio.good_packets_count - last_pkt_count_;
+      uint32_t bad_packets = va_cio.bad_packets_count;
 
       if (dsp_enabled) {
         ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | DSP: pkts=%lu | Btn:0x%04X",
-                 (unsigned long)good_packets_, (unsigned long)pkt_delta,
+                 (unsigned long)va_cio.good_packets_count, (unsigned long)pkt_delta,
                  (unsigned long)bad_packets,
-                 (unsigned long)dsp_type1.getGoodPackets(),
+                 (unsigned long)va_dsp.good_packets_count,
                  current_button_code_);
       } else {
-        ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | ISR: cs=%lu(+%lu) clk=%lu(+%lu) | Btn:0x%04X",
-                 (unsigned long)good_packets_, (unsigned long)pkt_delta,
+        ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | Btn:0x%04X",
+                 (unsigned long)va_cio.good_packets_count, (unsigned long)pkt_delta,
                  (unsigned long)bad_packets,
-                 (unsigned long)cs_count, (unsigned long)cs_delta,
-                 (unsigned long)clk_count, (unsigned long)clk_delta,
                  current_button_code_);
       }
 
-      last_cs_count_ = cs_count;
-      last_clk_count_ = clk_count;
-      last_pkt_count_ = good_packets_;
+      last_pkt_count_ = va_cio.good_packets_count;
     }
     last_stats_time_ = now;
   }
@@ -329,15 +300,13 @@ void BestwaySpa::dump_config() {
     }
 
     if (is_type1) {
-      ESP_LOGCONFIG(TAG, "  CIO Good packets: %lu", (unsigned long)cio_type1.getGoodPackets());
-      ESP_LOGCONFIG(TAG, "  CIO Bad packets: %lu", (unsigned long)cio_type1.getBadPackets());
+      ESP_LOGCONFIG(TAG, "  CIO Good packets: %lu", (unsigned long)va_cio.good_packets_count);
+      ESP_LOGCONFIG(TAG, "  CIO Bad packets: %lu", (unsigned long)va_cio.bad_packets_count);
       if (dsp_enabled) {
-        ESP_LOGCONFIG(TAG, "  DSP Good packets: %lu", (unsigned long)dsp_type1.getGoodPackets());
+        ESP_LOGCONFIG(TAG, "  DSP Good packets: %lu", (unsigned long)va_dsp.good_packets_count);
       }
-    } else {
-      ESP_LOGCONFIG(TAG, "  CIO Good packets: %lu", (unsigned long)cio_type2.getGoodPackets());
-      ESP_LOGCONFIG(TAG, "  CIO Bad packets: %lu", (unsigned long)cio_type2.getBadPackets());
     }
+    // TYPE2 not yet implemented
   }
 
   LOG_CLIMATE("", "Bestway Spa Climate", this);
@@ -512,66 +481,133 @@ void BestwaySpa::send_4wire_response_() {
 }
 
 // =============================================================================
-// 6-WIRE PROTOCOL HANDLER - Uses modular CIO and DSP classes
+// 6-WIRE PROTOCOL HANDLER - Uses VA source files directly
 // Based on VA firmware BWC::loop():
-//   cio->updateStates();                // Read from CIO (done via ISR)
-//   dsp->dsp_states = cio->cio_states;  // Copy states
-//   dsp->handleStates();                // Send to DSP (physical display)
-//   dsp->updateToggles();               // Read buttons from DSP
-//   cio->cio_toggles = dsp->dsp_toggles;// Copy toggles
-//   cio->handleToggles();               // Send to CIO (pump controller)
+//   cio->updateStates();                // Parse CIO packets (ISR fills buffer)
+//   dsp->dsp_states = cio->cio_states;  // Copy states to DSP
+//   dsp->handleStates();                // Send to physical display
+//   button = dsp->getPressedButton();   // Read button from physical display
+//   cio->setButtonCode();               // Set button for transmission
 // =============================================================================
 
 void BestwaySpa::handle_6wire_protocol_() {
-  uint8_t packet[16];
-  bool has_packet = false;
+  if (!is_type1) {
+    // TYPE2 not yet implemented
+    return;
+  }
 
   // =========================================================================
-  // STEP 1: cio->updateStates() - Read from CIO (done via ISR in cio_type1.cpp)
+  // STEP 1: cio->updateStates() - Process CIO packets received via ISR
+  // The ISR fills _payload buffer, updateStates() parses it into cio_states
   // =========================================================================
-  // Check appropriate CIO handler for new packets
-  if (is_type1) {
-    if (cio_type1.isPacketReady()) {
-      has_packet = cio_type1.getPacket(packet, 11);
+  va_cio.updateStates();
 
-      // Validate packet structure before parsing
-      if (has_packet && !CioType1::validatePacket(packet)) {
-        ESP_LOGV(TAG, "Rejected invalid TYPE1 packet");
-        has_packet = false;
-      }
+  // Check if we got new packet(s) by comparing packet count
+  if (va_cio.good_packets_count > good_packets_) {
+    good_packets_ = va_cio.good_packets_count;
+
+    // Copy VA cio_states to our SpaState
+    const bestway_va::sStates& cio = va_cio.cio_states;
+
+    // Parse into pending state for debouncing
+    SpaState new_state;
+    new_state.power = cio.power;
+    new_state.heater_red = cio.heatred;
+    new_state.heater_green = cio.heatgrn;
+    new_state.heater_enabled = cio.heat;
+    new_state.filter_pump = cio.pump;
+    new_state.bubbles = cio.bubbles;
+    new_state.jets = cio.jets;
+    new_state.locked = cio.locked;
+    new_state.unit_celsius = (cio.unit == 0);  // 0 = C, 1 = F
+    new_state.error_code = cio.error;
+
+    // Temperature from VA (already parsed from 7-segment)
+    float temp = (float)cio.temperature;
+    if (!new_state.unit_celsius && temp > 60.0f) {
+      // Convert F to C for internal storage
+      temp = (temp - 32.0f) * 5.0f / 9.0f;
     }
-  } else {
-    if (cio_type2.isPacketReady()) {
-      has_packet = cio_type2.getPacket(packet, 5);
+    new_state.current_temp = temp;
+
+    // Display characters
+    new_state.display_chars[0] = (char)cio.char1;
+    new_state.display_chars[1] = (char)cio.char2;
+    new_state.display_chars[2] = (char)cio.char3;
+    new_state.display_chars[3] = '\0';
+
+    // Debounce: Check if new state matches pending state
+    bool states_match =
+        (new_state.power == pending_state_.power) &&
+        (new_state.heater_red == pending_state_.heater_red) &&
+        (new_state.heater_green == pending_state_.heater_green) &&
+        (new_state.filter_pump == pending_state_.filter_pump) &&
+        (new_state.bubbles == pending_state_.bubbles) &&
+        (new_state.jets == pending_state_.jets) &&
+        (new_state.locked == pending_state_.locked) &&
+        (std::fabs(new_state.current_temp - pending_state_.current_temp) < 1.0f);
+
+    if (states_match) {
+      state_match_count_++;
+    } else {
+      pending_state_ = new_state;
+      state_match_count_ = 1;
+    }
+
+    // Update actual state when we have consistent readings
+    if (state_match_count_ >= STATE_DEBOUNCE_COUNT) {
+      state_.power = new_state.power;
+      state_.heater_red = new_state.heater_red;
+      state_.heater_green = new_state.heater_green;
+      state_.heater_enabled = new_state.heater_enabled;
+      state_.filter_pump = new_state.filter_pump;
+      state_.bubbles = new_state.bubbles;
+      state_.jets = new_state.jets;
+      state_.locked = new_state.locked;
+      state_.unit_celsius = new_state.unit_celsius;
+      state_.current_temp = new_state.current_temp;
+      state_.error_code = new_state.error_code;
+      state_.display_chars[0] = new_state.display_chars[0];
+      state_.display_chars[1] = new_state.display_chars[1];
+      state_.display_chars[2] = new_state.display_chars[2];
+      state_.display_chars[3] = '\0';
+      state_.brightness = va_cio.brightness;
+
+      ESP_LOGD(TAG, "CIO: '%c%c%c' T:%.0f Pwr:%d Heat:%d Pump:%d",
+               state_.display_chars[0], state_.display_chars[1], state_.display_chars[2],
+               state_.current_temp,
+               state_.power ? 1 : 0,
+               state_.heater_enabled ? 1 : 0,
+               state_.filter_pump ? 1 : 0);
     }
   }
 
-  if (has_packet) {
-    parse_6wire_cio_packet_(packet);
-    good_packets_++;
+  // =========================================================================
+  // STEP 2 & 3: Copy CIO states to DSP and send to physical display
+  // =========================================================================
+  if (dsp_enabled) {
+    // Copy CIO states to DSP (this is what VA does)
+    va_dsp.dsp_states = va_cio.cio_states;
+    va_dsp.dsp_states.brightness = state_.brightness;  // Allow HA override
+
+    // Send to physical display at ~20Hz (rate-limited inside handleStates)
+    va_dsp.handleStates();
   }
 
   // =========================================================================
-  // STEP 2 & 3: dsp->handleStates() - Forward display states to physical display
+  // STEP 4: Read button presses from physical display
   // =========================================================================
-  if (dsp_enabled && is_type1) {
-    // Send current state to physical display at ~20Hz
-    dsp_type1.handleStates(state_, state_.brightness);
-  }
+  if (dsp_enabled) {
+    bestway_va::Buttons button = va_dsp.getPressedButton();
 
-  // =========================================================================
-  // STEP 4: dsp->updateToggles() - Read button presses from physical display
-  // =========================================================================
-  if (dsp_enabled && is_type1) {
-    Buttons button = dsp_type1.updateToggles();
-
-    // If physical button was pressed, queue it for transmission to CIO
-    if (button != NOBTN) {
+    if (button != bestway_va::NOBTN) {
       ESP_LOGI(TAG, "Physical display button: %d", button);
 
-      // Check if button is enabled (can be disabled via HA)
-      if (is_button_enabled(button)) {
-        queue_button_(button);
+      // Convert VA button enum to ESPHome button enum (they're identical)
+      Buttons esphome_btn = static_cast<Buttons>(button);
+
+      if (is_button_enabled(esphome_btn)) {
+        queue_button_(esphome_btn);
       } else {
         ESP_LOGI(TAG, "Button %d disabled, ignoring", button);
       }
@@ -579,111 +615,14 @@ void BestwaySpa::handle_6wire_protocol_() {
   }
 
   // =========================================================================
-  // STEP 5 & 6: cio->handleToggles() - Send button code to CIO
-  // This is done in process_button_queue_() which sets current_button_code_
-  // The ISR in cio_type1.cpp then transmits this code during button windows
+  // STEP 5: Button transmission to CIO is handled by:
+  // - process_button_queue_() sets current_button_code_
+  // - loop() calls va_cio.setButtonCode(current_button_code_)
+  // - CIO ISR transmits button code when pump controller requests it (0x42)
   // =========================================================================
 }
 
-void BestwaySpa::parse_6wire_cio_packet_(const uint8_t *packet) {
-  // Parse into temporary/pending state first (for debouncing)
-  SpaState new_state;
-  char display_chars[4];
-
-  // Use protocol-specific parsing
-  if (is_type1) {
-    // Log raw packet for debugging
-    ESP_LOGV(TAG, "CIO Raw: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
-             packet[0], packet[1], packet[2], packet[3], packet[4],
-             packet[5], packet[6], packet[7], packet[8], packet[9], packet[10]);
-
-    // Use CioType1 static parser
-    CioType1::parsePacket(packet,
-                          &new_state.current_temp,
-                          &new_state.heater_red, &new_state.heater_green,
-                          &new_state.filter_pump, &new_state.bubbles, &new_state.jets,
-                          &new_state.locked, &new_state.power, &new_state.unit_celsius,
-                          display_chars);
-  } else {
-    // Log raw packet for debugging
-    ESP_LOGV(TAG, "CIO Raw: %02X %02X %02X %02X %02X",
-             packet[0], packet[1], packet[2], packet[3], packet[4]);
-
-    // Use CioType2 static parser
-    CioType2::parsePacket(packet,
-                          &new_state.current_temp,
-                          &new_state.heater_red, &new_state.heater_green,
-                          &new_state.filter_pump, &new_state.bubbles, &new_state.jets,
-                          &new_state.locked, &new_state.power, &new_state.unit_celsius,
-                          display_chars);
-  }
-
-  new_state.display_chars[0] = display_chars[0];
-  new_state.display_chars[1] = display_chars[1];
-  new_state.display_chars[2] = display_chars[2];
-  new_state.display_chars[3] = '\0';
-  new_state.heater_enabled = new_state.heater_green || new_state.heater_red;
-
-  // Always store temperature in Celsius internally
-  // If spa is displaying Fahrenheit, convert to Celsius
-  if (!new_state.unit_celsius) {
-    // Spa is in Fahrenheit mode - convert to Celsius
-    // Valid spa temperatures in F are typically 68-104°F (20-40°C)
-    if (new_state.current_temp >= 60.0f && new_state.current_temp <= 110.0f) {
-      // Looks like a valid Fahrenheit reading, convert to Celsius
-      new_state.current_temp = (new_state.current_temp - 32.0f) * 5.0f / 9.0f;
-      ESP_LOGD(TAG, "Converted F to C: %.1f°C", new_state.current_temp);
-    } else if (new_state.current_temp >= 15.0f && new_state.current_temp <= 45.0f) {
-      // Already looks like Celsius despite F mode flag - leave as is
-      ESP_LOGD(TAG, "Temp %.0f looks like Celsius despite F mode, not converting", new_state.current_temp);
-    }
-  }
-
-  // Debounce: Check if new state matches pending state
-  bool states_match =
-      (new_state.power == pending_state_.power) &&
-      (new_state.heater_red == pending_state_.heater_red) &&
-      (new_state.heater_green == pending_state_.heater_green) &&
-      (new_state.filter_pump == pending_state_.filter_pump) &&
-      (new_state.bubbles == pending_state_.bubbles) &&
-      (new_state.jets == pending_state_.jets) &&
-      (new_state.locked == pending_state_.locked) &&
-      (std::fabs(new_state.current_temp - pending_state_.current_temp) < 1.0f);
-
-  if (states_match) {
-    state_match_count_++;
-  } else {
-    // New state differs from pending - start fresh
-    pending_state_ = new_state;
-    state_match_count_ = 1;
-  }
-
-  // Only update actual state when we have consistent readings
-  if (state_match_count_ >= STATE_DEBOUNCE_COUNT) {
-    // Update actual state
-    state_.power = new_state.power;
-    state_.heater_red = new_state.heater_red;
-    state_.heater_green = new_state.heater_green;
-    state_.heater_enabled = new_state.heater_enabled;
-    state_.filter_pump = new_state.filter_pump;
-    state_.bubbles = new_state.bubbles;
-    state_.jets = new_state.jets;
-    state_.locked = new_state.locked;
-    state_.unit_celsius = new_state.unit_celsius;
-    state_.current_temp = new_state.current_temp;
-    state_.display_chars[0] = new_state.display_chars[0];
-    state_.display_chars[1] = new_state.display_chars[1];
-    state_.display_chars[2] = new_state.display_chars[2];
-    state_.display_chars[3] = '\0';
-
-    ESP_LOGD(TAG, "CIO Chars: '%c' '%c' '%c' Temp:%.0f Power:%d Heat:%d Pump:%d",
-             state_.display_chars[0], state_.display_chars[1], state_.display_chars[2],
-             state_.current_temp,
-             state_.power ? 1 : 0,
-             state_.heater_enabled ? 1 : 0,
-             state_.filter_pump ? 1 : 0);
-  }
-}
+// parse_6wire_cio_packet_ removed - parsing now done by VA's updateStates()
 
 // =============================================================================
 // DATA PIN HELPERS
@@ -934,18 +873,7 @@ uint16_t BestwaySpa::get_button_code_(Buttons button) {
   }
 }
 
-// =============================================================================
-// CHARACTER DECODING
-// =============================================================================
-
-char BestwaySpa::decode_7segment_(uint8_t segments, bool is_type1_proto) {
-  // Use the appropriate CIO class decoder
-  if (is_type1_proto) {
-    return CioType1::decodeChar(segments);
-  } else {
-    return CioType2::decodeChar(segments);
-  }
-}
+// Character decoding removed - now done by VA's _getChar() method
 
 // =============================================================================
 // CONTROL METHODS
