@@ -89,11 +89,13 @@ CONFIG_SCHEMA = cv.All(
         cv.Optional(CONF_CURRENT_TEMPERATURE): sensor.sensor_schema(
             device_class=DEVICE_CLASS_TEMPERATURE,
             state_class=STATE_CLASS_MEASUREMENT,
+            unit_of_measurement="°C",
             accuracy_decimals=1,
         ),
         cv.Optional(CONF_TARGET_TEMPERATURE): sensor.sensor_schema(
             device_class=DEVICE_CLASS_TEMPERATURE,
             state_class=STATE_CLASS_MEASUREMENT,
+            unit_of_measurement="°C",
             accuracy_decimals=1,
         ),
 
