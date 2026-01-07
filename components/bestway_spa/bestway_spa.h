@@ -204,6 +204,7 @@ class BestwaySpaBubblesSwitch;
 class BestwaySpaJetsSwitch;
 class BestwaySpaLockSwitch;
 class BestwaySpaPowerSwitch;
+class BestwaySpaUnitSwitch;
 
 class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Component {
  public:
@@ -253,6 +254,9 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   void set_error_text_sensor(text_sensor::TextSensor *sensor) { error_text_sensor_ = sensor; }
   void set_display_text_sensor(text_sensor::TextSensor *sensor) { display_text_sensor_ = sensor; }
   void set_button_status_sensor(text_sensor::TextSensor *sensor) { button_status_sensor_ = sensor; }
+
+  // Unit switch (for state-based updates)
+  void set_unit_switch(BestwaySpaUnitSwitch *sw) { unit_switch_ = sw; }
 
   // Control methods (called by switches and automation)
   void set_power(bool state);
@@ -342,6 +346,9 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   text_sensor::TextSensor *error_text_sensor_{nullptr};
   text_sensor::TextSensor *display_text_sensor_{nullptr};
   text_sensor::TextSensor *button_status_sensor_{nullptr};
+
+  // Unit switch (for state-based updates from spa)
+  BestwaySpaUnitSwitch *unit_switch_{nullptr};
 
   // Packet buffers
   std::vector<uint8_t> rx_buffer_;
@@ -461,11 +468,24 @@ class BestwaySpaPowerSwitch : public switch_::Switch, public Component {
 
 class BestwaySpaUnitSwitch : public switch_::Switch, public Component {
  public:
-  void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void set_parent(BestwaySpa *parent) {
+    parent_ = parent;
+    parent_->set_unit_switch(this);  // Register with parent for state updates
+  }
+  void setup() override {
+    // Default: assume Celsius until spa tells us otherwise
+    // ON = Celsius, OFF = Fahrenheit
+    publish_state(true);
+  }
   void write_state(bool state) override {
-    // state: true = Celsius, false = Fahrenheit
+    // Toggle spa's temperature unit (spa toggles on each button press)
+    // The actual state will be updated when spa responds via update_sensors_()
     parent_->set_unit(state);
-    publish_state(state);
+    // Don't publish here - let update_sensors_() publish based on actual spa state
+  }
+  // Called by BestwaySpa::update_sensors_() to reflect actual spa state
+  void update_from_spa(bool is_celsius) {
+    publish_state(is_celsius);  // ON = Celsius, OFF = Fahrenheit
   }
  protected:
   BestwaySpa *parent_{nullptr};

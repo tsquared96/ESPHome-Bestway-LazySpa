@@ -767,6 +767,11 @@ void BestwaySpa::update_sensors_() {
     power_sensor_->publish_state(state_.power);
   }
 
+  // Update unit switch with actual spa state (Option A - state-based)
+  if (unit_switch_ != nullptr) {
+    unit_switch_->update_from_spa(state_.unit_celsius);
+  }
+
   if (error_sensor_ != nullptr) {
     error_sensor_->publish_state(state_.error_code != 0);
   }
