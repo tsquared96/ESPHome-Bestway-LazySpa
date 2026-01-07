@@ -4,6 +4,7 @@ from esphome import pins
 from esphome.components import climate, uart, sensor, binary_sensor, text_sensor
 from esphome.const import (
     CONF_ID,
+    CONF_UART_ID,
     DEVICE_CLASS_TEMPERATURE,
     STATE_CLASS_MEASUREMENT,
 )
@@ -45,15 +46,16 @@ from . import (
     CONF_PREVENT_HIBERNATE,
 )
 
-DEPENDENCIES = ["uart"]
+# No global DEPENDENCIES - UART is only needed for 4-wire
 AUTO_LOAD = ["sensor", "binary_sensor", "text_sensor"]
 
 
-def validate_6wire_pins(config):
-    """Validate that 6-wire protocols have required pins configured."""
+def validate_protocol_config(config):
+    """Validate protocol-specific configuration."""
     protocol = config.get(CONF_PROTOCOL_TYPE, "4WIRE")
+
     if protocol in ["6WIRE", "6WIRE_T1", "6WIRE_T2", "6WIRE_TYPE1", "6WIRE_TYPE2"]:
-        # Check for new dual-bus pins first, then fall back to legacy names
+        # 6-wire: Check for required GPIO pins
         has_cio_clk = CONF_CIO_CLK_PIN in config or CONF_CLK_PIN in config
         has_cio_data = CONF_CIO_DATA_PIN in config or CONF_DATA_PIN in config
         has_cio_cs = CONF_CIO_CS_PIN in config or CONF_CS_PIN in config
@@ -64,67 +66,75 @@ def validate_6wire_pins(config):
             raise cv.Invalid("cio_data_pin (or data_pin) is required for 6-wire protocols")
         if not has_cio_cs:
             raise cv.Invalid("cio_cs_pin (or cs_pin) is required for 6-wire protocols")
+    else:
+        # 4-wire: Check for UART
+        if CONF_UART_ID not in config:
+            raise cv.Invalid("uart_id is required for 4-wire protocol. Add 'uart:' section to your config.")
+
     return config
 
 
-# Use climate._CLIMATE_SCHEMA for ESPHome 2024+ (CLIMATE_SCHEMA is now private)
+# Base schema without UART (for 6-wire protocols)
+_BASE_SCHEMA = climate._CLIMATE_SCHEMA.extend({
+    cv.GenerateID(): cv.declare_id(BestwaySpa),
+
+    # Protocol configuration
+    cv.Optional(CONF_PROTOCOL_TYPE, default="4WIRE"): cv.enum(PROTOCOL_TYPES, upper=True),
+    cv.Optional(CONF_MODEL, default="54154"): cv.enum(SPA_MODELS, upper=True),
+
+    # Anti-hibernate: automatically wake spa when 72-hour timer hibernates it
+    cv.Optional(CONF_PREVENT_HIBERNATE, default=True): cv.boolean,
+
+    # UART ID (optional - only needed for 4-wire)
+    cv.Optional(CONF_UART_ID): cv.use_id(uart.UARTComponent),
+
+    # 6-wire MITM dual-bus pin configuration
+    # CIO bus pins (input from pump controller)
+    cv.Optional(CONF_CIO_CLK_PIN): pins.internal_gpio_input_pin_schema,
+    cv.Optional(CONF_CIO_DATA_PIN): pins.internal_gpio_input_pin_schema,
+    cv.Optional(CONF_CIO_CS_PIN): pins.internal_gpio_input_pin_schema,
+    # DSP bus pins (to physical display panel)
+    cv.Optional(CONF_DSP_DATA_PIN): pins.internal_gpio_output_pin_schema,
+    cv.Optional(CONF_DSP_CLK_PIN): pins.internal_gpio_output_pin_schema,
+    cv.Optional(CONF_DSP_CS_PIN): pins.internal_gpio_output_pin_schema,
+    cv.Optional(CONF_AUDIO_PIN): pins.internal_gpio_output_pin_schema,
+    # Legacy pin names (for backwards compatibility)
+    cv.Optional(CONF_CLK_PIN): pins.internal_gpio_input_pin_schema,
+    cv.Optional(CONF_DATA_PIN): pins.internal_gpio_input_pin_schema,
+    cv.Optional(CONF_CS_PIN): pins.internal_gpio_input_pin_schema,
+
+    # Temperature sensors
+    cv.Optional(CONF_CURRENT_TEMPERATURE): sensor.sensor_schema(
+        device_class=DEVICE_CLASS_TEMPERATURE,
+        state_class=STATE_CLASS_MEASUREMENT,
+        unit_of_measurement="°C",
+        accuracy_decimals=1,
+    ),
+    cv.Optional(CONF_TARGET_TEMPERATURE): sensor.sensor_schema(
+        device_class=DEVICE_CLASS_TEMPERATURE,
+        state_class=STATE_CLASS_MEASUREMENT,
+        unit_of_measurement="°C",
+        accuracy_decimals=1,
+    ),
+
+    # Binary sensors
+    cv.Optional(CONF_HEATING): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_FILTER): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_BUBBLES): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_JETS): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_LOCKED): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_POWER): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_ERROR): binary_sensor.binary_sensor_schema(),
+
+    # Text sensors
+    cv.Optional(CONF_ERROR_TEXT): text_sensor.text_sensor_schema(),
+    cv.Optional(CONF_DISPLAY_TEXT): text_sensor.text_sensor_schema(),
+    cv.Optional(CONF_BUTTON_STATUS): text_sensor.text_sensor_schema(),
+}).extend(cv.COMPONENT_SCHEMA)
+
 CONFIG_SCHEMA = cv.All(
-    climate._CLIMATE_SCHEMA.extend({
-        cv.GenerateID(): cv.declare_id(BestwaySpa),
-
-        # Protocol configuration
-        cv.Optional(CONF_PROTOCOL_TYPE, default="4WIRE"): cv.enum(PROTOCOL_TYPES, upper=True),
-        cv.Optional(CONF_MODEL, default="54154"): cv.enum(SPA_MODELS, upper=True),
-
-        # Anti-hibernate: automatically wake spa when 72-hour timer hibernates it
-        cv.Optional(CONF_PREVENT_HIBERNATE, default=True): cv.boolean,
-
-        # 6-wire MITM dual-bus pin configuration
-        # CIO bus pins (input from pump controller)
-        cv.Optional(CONF_CIO_CLK_PIN): pins.internal_gpio_input_pin_schema,
-        cv.Optional(CONF_CIO_DATA_PIN): pins.internal_gpio_input_pin_schema,
-        cv.Optional(CONF_CIO_CS_PIN): pins.internal_gpio_input_pin_schema,
-        # DSP bus pins (to physical display panel)
-        cv.Optional(CONF_DSP_DATA_PIN): pins.internal_gpio_output_pin_schema,
-        cv.Optional(CONF_DSP_CLK_PIN): pins.internal_gpio_output_pin_schema,
-        cv.Optional(CONF_DSP_CS_PIN): pins.internal_gpio_output_pin_schema,
-        cv.Optional(CONF_AUDIO_PIN): pins.internal_gpio_output_pin_schema,
-        # Legacy pin names (for backwards compatibility)
-        cv.Optional(CONF_CLK_PIN): pins.internal_gpio_input_pin_schema,
-        cv.Optional(CONF_DATA_PIN): pins.internal_gpio_input_pin_schema,
-        cv.Optional(CONF_CS_PIN): pins.internal_gpio_input_pin_schema,
-
-        # Temperature sensors
-        cv.Optional(CONF_CURRENT_TEMPERATURE): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_TEMPERATURE,
-            state_class=STATE_CLASS_MEASUREMENT,
-            unit_of_measurement="°C",
-            accuracy_decimals=1,
-        ),
-        cv.Optional(CONF_TARGET_TEMPERATURE): sensor.sensor_schema(
-            device_class=DEVICE_CLASS_TEMPERATURE,
-            state_class=STATE_CLASS_MEASUREMENT,
-            unit_of_measurement="°C",
-            accuracy_decimals=1,
-        ),
-
-        # Binary sensors
-        cv.Optional(CONF_HEATING): binary_sensor.binary_sensor_schema(),
-        cv.Optional(CONF_FILTER): binary_sensor.binary_sensor_schema(),
-        cv.Optional(CONF_BUBBLES): binary_sensor.binary_sensor_schema(),
-        cv.Optional(CONF_JETS): binary_sensor.binary_sensor_schema(),
-        cv.Optional(CONF_LOCKED): binary_sensor.binary_sensor_schema(),
-        cv.Optional(CONF_POWER): binary_sensor.binary_sensor_schema(),
-        cv.Optional(CONF_ERROR): binary_sensor.binary_sensor_schema(),
-
-        # Text sensors
-        cv.Optional(CONF_ERROR_TEXT): text_sensor.text_sensor_schema(),
-        cv.Optional(CONF_DISPLAY_TEXT): text_sensor.text_sensor_schema(),
-        cv.Optional(CONF_BUTTON_STATUS): text_sensor.text_sensor_schema(),
-    })
-    .extend(uart.UART_DEVICE_SCHEMA)
-    .extend(cv.COMPONENT_SCHEMA),
-    validate_6wire_pins,
+    _BASE_SCHEMA,
+    validate_protocol_config,
 )
 
 
@@ -132,7 +142,11 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     await climate.register_climate(var, config)
-    await uart.register_uart_device(var, config)
+
+    # Only register UART for 4-wire protocol
+    if CONF_UART_ID in config:
+        uart_component = await cg.get_variable(config[CONF_UART_ID])
+        cg.add(var.set_uart_parent(uart_component))
 
     # Set protocol type
     cg.add(var.set_protocol_type(config[CONF_PROTOCOL_TYPE]))
