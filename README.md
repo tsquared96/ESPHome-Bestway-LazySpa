@@ -1,3 +1,5 @@
+# NOTE THIS IS A WORK IN PROGRESS - I HAVE NOT YET SORTED OUT ALL THE DETAILS BUT I AM GETTING CLOSER!
+
 # Bestway Lay-Z-Spa ESPHome Firmware
 
 **Native ESPHome firmware for Bestway spas using VisualApproach hardware.**
