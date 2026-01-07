@@ -12,8 +12,8 @@
 
 #include "bestway_spa.h"
 // Use VA source files for 6-wire TYPE1 protocol
-#include "va/CIO_TYPE1.h"
-#include "va/DSP_TYPE1.h"
+#include "CIO_TYPE1.h"
+#include "DSP_TYPE1.h"
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
 #include <Arduino.h>
