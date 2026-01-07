@@ -143,6 +143,10 @@ async def to_code(config):
     await cg.register_component(var, config)
     await climate.register_climate(var, config)
 
+    # Add EspSoftwareSerial library for ESP8266 (needed by 4-wire code even if not used)
+    # ESPHome compiles all .cpp files, so the library must be available
+    cg.add_library("plerup/EspSoftwareSerial", "8.0.1")
+
     # Only register UART for 4-wire protocol
     if CONF_UART_ID in config:
         uart_component = await cg.get_variable(config[CONF_UART_ID])
