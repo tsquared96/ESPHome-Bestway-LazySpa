@@ -329,8 +329,8 @@ climate::ClimateTraits BestwaySpa::traits() {
   traits.set_visual_max_temperature(40.0f);
   traits.set_visual_temperature_step(1.0f);
 
-  // Support both Celsius and Fahrenheit display
-  traits.set_supports_current_temperature(true);
+  // Current temperature support is automatic in ESPHome 2024+
+  // (detected when this->current_temperature is set)
 
   return traits;
 }
