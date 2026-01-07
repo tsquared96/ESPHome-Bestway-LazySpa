@@ -603,8 +603,10 @@ void BestwaySpa::handle_6wire_protocol_() {
 
   // =========================================================================
   // STEP 4: Read button presses from physical display
+  // Only read if we're getting CIO packets (spa actually connected)
+  // Otherwise floating DSP pins will read as garbage button presses
   // =========================================================================
-  if (dsp_enabled) {
+  if (dsp_enabled && good_packets_ > 0) {
     bestway_va::Buttons button = va_dsp.getPressedButton();
 
     if (button != bestway_va::NOBTN) {
