@@ -1,118 +1,184 @@
-# Bestway Lay-Z-Spa ESPHome Firmware
+# Bestway Lay-Z-Spa ESPHome Component
 
-**Native ESPHome firmware for Bestway spas using VisualApproach hardware.**
+**Native ESPHome component for Bestway/Lay-Z-Spa hot tubs using VisualApproach hardware.**
 
-This completely replaces the VisualApproach firmware with pure ESPHome, giving you native Home Assistant integration with no MQTT broker needed.
+This project provides an ESPHome-native implementation that integrates directly with Home Assistant, eliminating the need for MQTT while maintaining full compatibility with the VisualApproach hardware design.
 
-## Overview
+## Credits & Acknowledgments
+
+This project is built upon the excellent work of **[VisualApproach](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA)**:
+
+- **Hardware Design**: The PCB design, level shifter circuits, and connector specifications are from VisualApproach
+- **Protocol Implementation**: The CIO/DSP communication code is adapted directly from the VisualApproach firmware
+- **Protocol Documentation**: All protocol reverse engineering and documentation comes from the VA project
+
+The VisualApproach project is licensed under **GPL v3**. This ESPHome component adapts their protocol handlers for the ESPHome framework while maintaining the same proven communication logic.
+
+### What's the Same as VisualApproach
+
+- **Hardware**: Uses the exact same VisualApproach PCB design (no hardware changes needed)
+- **Protocol Handling**: CIO/DSP packet parsing, button codes, state machines from VA code
+- **MITM Architecture**: Same dual-bus man-in-the-middle design intercepting CIO↔DSP communication
+- **Supported Models**: All models supported by VA are supported here
+- **Pin Assignments**: Same GPIO pin configurations
+
+### What's Different
+
+| Feature | VisualApproach | This ESPHome |
+|---------|----------------|--------------|
+| **Integration** | MQTT broker required | Native Home Assistant API |
+| **Configuration** | Web UI | YAML files |
+| **Updates** | Custom OTA | ESPHome OTA |
+| **Framework** | Custom Arduino | ESPHome framework |
+| **Web Interface** | Built-in full UI | Simple ESPHome web server |
+| **Logging** | Serial/debug | WiFi logs via ESPHome |
+| **Climate Mode/Action** | Has "idle" mode bug (#919) | Correctly separates mode vs action |
+
+## Architecture
+
+### MITM Dual-Bus Design
+
+The VisualApproach hardware implements a man-in-the-middle (MITM) architecture:
 
 ```
-[Bestway Spa] ←serial/SPI→ [ESP8266 + ESPHome] ←API→ [Home Assistant]
+┌─────────────┐     CIO Bus      ┌─────────────┐     DSP Bus      ┌─────────────┐
+│    CIO      │ ←──────────────→ │    ESP      │ ←──────────────→ │    DSP      │
+│ (Pump/Heat  │   (CLK,DATA,CS)  │  (ESPHome)  │   (CLK,DATA,CS)  │  (Display)  │
+│ Controller) │                  │             │                  │   Panel     │
+└─────────────┘                  └─────────────┘                  └─────────────┘
 ```
 
-**You keep the existing VisualApproach PCB hardware** (level shifters, connectors, etc.) but replace the firmware with this ESPHome implementation.
+**CIO (Control I/O)**: The pump/heater controller in the spa. Sends status packets.
+**DSP (Display)**: The physical display panel with buttons. Receives display data, sends button presses.
+**ESP**: Sits in the middle, intercepts both directions, can inject button presses.
 
-## Why Replace VisualApproach Firmware?
+### Data Flow
 
-- **Simpler** - No MQTT broker needed
-- **Faster** - Direct Home Assistant API
-- **Cleaner** - Native ESPHome component
-- **Better integration** - Automatic discovery, services, automations
-- **OTA updates** - Update from Home Assistant UI
-- **More reliable** - ESPHome's proven stability
+1. **CIO → ESP**: ESP receives status (temp, heater, pump states)
+2. **ESP → DSP**: ESP forwards display data to physical panel
+3. **DSP → ESP**: ESP reads button presses from physical panel
+4. **ESP → CIO**: ESP can inject virtual button presses for Home Assistant control
+
+## Supported Protocols & Models
+
+### 6-Wire TYPE1 (Pre-2021 "Egg-Style" Pumps)
+
+SPI-like protocol with 11-byte packets. Used by older spas with the egg-shaped pump housing.
+
+| Model | Jets | Air | Notes |
+|-------|------|-----|-------|
+| PRE2021 | No | Yes | Standard pre-2021 model |
+| P05504 | No | Yes | Variant with different button codes |
+
+**Features specific to TYPE1:**
+- 72-hour hibernate timer (auto-wake feature available)
+- Interrupt-driven packet reception
+- 16-bit button codes
+
+### 6-Wire TYPE2 (54149E)
+
+Different bit ordering and 5-byte packets.
+
+| Model | Jets | Air | Notes |
+|-------|------|-----|-------|
+| 54149E | Yes | Yes | Newer 6-wire protocol |
+
+### 4-Wire UART (2021+ Models)
+
+Standard UART at 9600 baud with 7-byte packets. Uses SoftwareSerial for DSP communication.
+
+| Model | Jets | Air | Notes |
+|-------|------|-----|-------|
+| 54123 | No | Yes | Bubbles only |
+| 54138 | Yes | Yes | Full featured |
+| 54144 | Yes | No | Jets only |
+| 54154 | No | Yes | Bubbles only |
+| 54173 | Yes | Yes | Full featured |
 
 ## Features
 
 ### Climate Entity
-- Full thermostat control with temperature display (current & target)
-- Heat/Fan/Off modes with heating action status
+- Full thermostat control with current and target temperature
+- Mode: Heat, Fan Only (filter), Off
+- Action: Heating, Idle, Fan, Off (correctly implemented - no VA bug #919)
 
-### Switches
+### Control Switches
 - Power on/off
 - Heater on/off
 - Filter pump on/off
 - Air bubbles on/off
 - Hydrojets on/off (model-dependent)
-- Child lock
+- Child lock on/off
+- Temperature unit toggle (Celsius/Fahrenheit)
 
 ### Sensors
-- Current temperature (with smoothing)
-- Target temperature
-- Power status (binary)
-- Heating status (binary)
-- Filter running (binary)
-- Bubbles running (binary)
-- Jets running (binary)
-- Lock status (binary)
-- Error detection (binary)
-- Error code (text)
-- Display text
+- Current water temperature
+- Target temperature setpoint
+- All state binary sensors (power, heating, filter, bubbles, jets, locked, error)
+- Error code text sensor
+- Display text sensor (raw 3-character display)
 
-## Supported Protocols & Models
+### Anti-Hibernate Feature (TYPE1 Only)
 
-### 4-Wire UART (2021+ models)
-Standard UART protocol at 9600 baud. Most common on newer spas.
+Older "egg-style" pumps (6-wire TYPE1) have a built-in 72-hour timer that puts the spa into hibernate mode, displaying "END" on the panel. This feature:
 
-| Model | Jets | Air | Notes |
-|-------|------|-----|-------|
-| 54123 | No | No | Basic model |
-| 54138 | Yes | Yes | Full featured |
-| 54144 | Yes | No | Jets only |
-| 54154 | No | No | Basic model (default) |
-| 54173 | Yes | Yes | Full featured |
+- **Detects** the "END" display state automatically
+- **Auto-wakes** the spa by pressing the lock button for 3 seconds
+- **Enables year-round operation** without manual intervention every 72 hours
 
-### 6-Wire SPI-like (Pre-2021 models)
-Uses CLK, DATA, and CS pins for communication. Two protocol variants:
+```yaml
+climate:
+  - platform: bestway_spa
+    prevent_hibernate: true  # Default: true (only applies to TYPE1)
+```
 
-**TYPE1 Models:**
-| Model | Jets | Air | Notes |
-|-------|------|-----|-------|
-| PRE2021 | No | Yes | Standard pre-2021 |
-| P05504 | No | Yes | Variant with different button codes |
-
-**TYPE2 Models:**
-| Model | Jets | Air | Notes |
-|-------|------|-----|-------|
-| 54149E | No | Yes | Different bit ordering |
+**Note**: This 72-hour timer is reportedly only present in older egg-style pumps. Newer models (TYPE2, 4-wire) likely don't have this limitation.
 
 ## Hardware Requirements
 
-### Required Components
-You need the **VisualApproach PCB** which includes:
-- ESP8266 (NodeMCU or compatible)
-- TXS0108E bidirectional level shifter (8-channel)
-- Proper connectors for spa cable
-- Optional: 510-560Ω resistors on signal lines
+**You need the VisualApproach PCB hardware.** This project only provides firmware.
 
-### Where to Get Hardware
-- [EasyEDA/OSHWLab Project](https://oshwlab.com/visualapproach/bestway-wireless-controller-2_copy)
-- Order PCB_V2B design
-- See [VisualApproach build instructions (PDF)](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA/blob/master/bwc-manual.pdf)
-- [VisualApproach GitHub Repository](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA)
+### Required Components
+- ESP8266 D1 Mini (or NodeMCU)
+- VisualApproach PCB with TXS0108E level shifter
+- Appropriate connector for your spa model
+
+### Hardware Resources
+- [VisualApproach GitHub](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA)
+- [Build Manual (PDF)](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA/blob/master/bwc-manual.pdf)
+- [EasyEDA/OSHWLab PCB Project](https://oshwlab.com/visualapproach/bestway-wireless-controller-2_copy)
+
+**WARNING**: Never connect ESP directly to spa without level shifters - you will damage both!
 
 ## Pin Configuration
 
+### 6-Wire Models (MITM Dual-Bus)
+
+Per VisualApproach documentation:
+
+```
+CIO Bus (from pump controller - INPUT):
+  GPIO13 (D7) = CIO Data
+  GPIO4  (D2) = CIO Clock
+  GPIO5  (D1) = CIO Chip Select
+
+DSP Bus (to physical display - OUTPUT):
+  GPIO14 (D5) = DSP Data
+  GPIO2  (D4) = DSP Clock
+  GPIO0  (D3) = DSP Chip Select
+  GPIO12 (D6) = DSP Audio (optional buzzer)
+```
+
 ### 4-Wire Models (UART)
-```
-GPIO1 (TX)  → Level Shifter → Spa TX
-GPIO3 (RX)  → Level Shifter → Spa RX
-GPIO2       → Built-in LED (status)
-```
 
-### 6-Wire Models (SPI-like)
 ```
-GPIO14 (D5) → Level Shifter → CLK (Clock)
-GPIO12 (D6) → Level Shifter → DATA (Bidirectional)
-GPIO13 (D7) → Level Shifter → CS (Chip Select)
-GPIO15 (D8) → Level Shifter → AUDIO (Optional buzzer)
-GPIO2       → Built-in LED (status)
+GPIO1 (TX) = Spa communication
+GPIO3 (RX) = Spa communication
 ```
-
-**IMPORTANT:** Never connect ESP directly to spa - you will damage it! Always use level shifters.
 
 ## Installation
 
-### 1. Clone This Repository
+### 1. Clone Repository
 
 ```bash
 git clone https://github.com/tsquared96/ESPHome-Bestway-LazySpa.git
@@ -123,118 +189,114 @@ cd ESPHome-Bestway-LazySpa
 
 ```bash
 cp secrets.yaml.example secrets.yaml
-nano secrets.yaml
+# Edit secrets.yaml with your WiFi credentials
 ```
 
-Fill in your WiFi credentials and encryption keys.
+### 3. Choose Your Model Configuration
 
-### 3. Edit Configuration
+Pre-configured YAML files are provided for each model:
 
-Edit `bestway-spa.yaml` to match your spa model:
-
-**For 4-wire (2021+) models:**
-```yaml
-climate:
-  - platform: bestway_spa
-    protocol_type: 4WIRE
-    model: "54154"  # Change to match your model
-```
-
-**For 6-wire TYPE1 (pre-2021) models:**
-```yaml
-climate:
-  - platform: bestway_spa
-    protocol_type: 6WIRE
-    model: PRE2021
-    clk_pin: GPIO14
-    data_pin: GPIO12
-    cs_pin: GPIO13
-    audio_pin: GPIO15
-```
-
-**For 6-wire TYPE2 (54149E) models:**
-```yaml
-climate:
-  - platform: bestway_spa
-    protocol_type: 6WIRE_T2
-    model: 54149E
-    clk_pin: GPIO14
-    data_pin: GPIO12
-    cs_pin: GPIO13
-```
+| File | Model | Protocol |
+|------|-------|----------|
+| `bestway-spa-pre2021.yaml` | PRE2021/P05504 | 6-wire TYPE1 |
+| `bestway-spa-54149e.yaml` | 54149E | 6-wire TYPE2 |
+| `bestway-spa-54123.yaml` | 54123 | 4-wire UART |
+| `bestway-spa-54138.yaml` | 54138 | 4-wire UART |
+| `bestway-spa-54144.yaml` | 54144 | 4-wire UART |
+| `bestway-spa-54154.yaml` | 54154 | 4-wire UART |
+| `bestway-spa-54173.yaml` | 54173 | 4-wire UART |
 
 ### 4. Compile and Flash
 
-**First time (USB cable required):**
 ```bash
-esphome run bestway-spa.yaml
-```
+# First time (USB required)
+esphome run bestway-spa-pre2021.yaml
 
-**Subsequent updates (OTA):**
-```bash
-esphome run bestway-spa.yaml --device bestway-spa.local
+# OTA updates
+esphome run bestway-spa-pre2021.yaml --device bestway-spa.local
 ```
 
 ### 5. Add to Home Assistant
 
-Device auto-discovers via ESPHome API:
-1. Go to Settings → Devices & Services
-2. Click "Configure" on discovered ESPHome device
-3. Enter encryption key (from your secrets.yaml)
+The device auto-discovers via ESPHome integration. Enter your API encryption key when prompted.
 
 ## Configuration Reference
 
-### Protocol Types
+### Full 6-Wire TYPE1 Example
+
+```yaml
+climate:
+  - platform: bestway_spa
+    id: spa
+    name: "Hot Tub"
+
+    # Protocol and model
+    protocol_type: 6WIRE    # or 6WIRE_T1
+    model: PRE2021          # or P05504
+
+    # Anti-hibernate (TYPE1 only)
+    prevent_hibernate: true
+
+    # CIO bus pins (input from pump controller)
+    cio_data_pin: GPIO13
+    cio_clk_pin: GPIO4
+    cio_cs_pin: GPIO5
+
+    # DSP bus pins (output to physical display)
+    dsp_data_pin: GPIO14
+    dsp_clk_pin: GPIO2
+    dsp_cs_pin: GPIO0
+    audio_pin: GPIO12
+
+    # Sensors
+    current_temperature:
+      name: "Hot Tub Temperature"
+    heating:
+      name: "Hot Tub Heating"
+    filter:
+      name: "Hot Tub Filter"
+    bubbles:
+      name: "Hot Tub Bubbles"
+    locked:
+      name: "Hot Tub Locked"
+    power:
+      name: "Hot Tub Power"
+    error:
+      name: "Hot Tub Error"
+    error_text:
+      name: "Hot Tub Error Code"
+    display_text:
+      name: "Hot Tub Display"
+
+switch:
+  - platform: bestway_spa
+    spa_id: spa
+    heater:
+      name: "Hot Tub Heater"
+    filter:
+      name: "Hot Tub Filter"
+    bubbles:
+      name: "Hot Tub Bubbles"
+    lock:
+      name: "Hot Tub Lock"
+    power:
+      name: "Hot Tub Power"
+    unit:
+      name: "Hot Tub Unit (C/F)"
+```
+
+### Protocol Type Options
+
 | Value | Description |
 |-------|-------------|
 | `4WIRE` | Standard UART (2021+ models) |
-| `6WIRE` | SPI-like TYPE1 (pre-2021) |
-| `6WIRE_T1` | Same as 6WIRE |
-| `6WIRE_T2` | SPI-like TYPE2 (54149E) |
-
-### Model Options
-| Value | Protocol | Jets | Air |
-|-------|----------|------|-----|
-| `PRE2021` | 6WIRE_T1 | No | Yes |
-| `P05504` | 6WIRE_T1 | No | Yes |
-| `54149E` | 6WIRE_T2 | No | Yes |
-| `54123` | 4WIRE | No | No |
-| `54138` | 4WIRE | Yes | Yes |
-| `54144` | 4WIRE | Yes | No |
-| `54154` | 4WIRE | No | No |
-| `54173` | 4WIRE | Yes | Yes |
-
-### Available Sensors
-
-**Temperature Sensors:**
-- `current_temperature` - Water temperature
-- `target_temperature` - Set point
-
-**Binary Sensors:**
-- `power` - Power state
-- `heating` - Heater active
-- `filter` - Filter pump running
-- `bubbles` - Air bubbles active
-- `jets` - Hydrojets active (if supported)
-- `locked` - Child lock engaged
-- `error` - Error detected
-
-**Text Sensors:**
-- `error_text` - Error code (E01, E02, etc.)
-- `display_text` - Current display content
-
-### Available Switches
-
-- `bestway_spa_power` - Power control
-- `bestway_spa_heater` - Heater control
-- `bestway_spa_filter` - Filter pump control
-- `bestway_spa_bubbles` - Bubbles control
-- `bestway_spa_jets` - Jets control (model-dependent)
-- `bestway_spa_lock` - Child lock control
+| `6WIRE` | 6-wire TYPE1 (alias for 6WIRE_T1) |
+| `6WIRE_T1` | 6-wire TYPE1 (PRE2021, P05504) |
+| `6WIRE_T2` | 6-wire TYPE2 (54149E) |
 
 ## Home Assistant Examples
 
-### Dashboard Card
+### Thermostat Card
 
 ```yaml
 type: thermostat
@@ -245,7 +307,7 @@ entity: climate.hot_tub
 
 ```yaml
 automation:
-  - alias: "Heat Spa Evening"
+  - alias: "Heat Spa for Evening"
     trigger:
       - platform: time
         at: "16:00:00"
@@ -262,11 +324,11 @@ automation:
           hvac_mode: heat
 ```
 
-### Automation: Filter Cycle
+### Automation: Filter Cycles
 
 ```yaml
 automation:
-  - alias: "Filter Cycle"
+  - alias: "Spa Filter Cycle"
     trigger:
       - platform: time
         at: "08:00:00"
@@ -274,194 +336,94 @@ automation:
         at: "20:00:00"
     action:
       - service: switch.turn_on
-        target:
-          entity_id: switch.hot_tub_filter_pump
+        entity_id: switch.hot_tub_filter
       - delay: "02:00:00"
       - service: switch.turn_off
-        target:
-          entity_id: switch.hot_tub_filter_pump
-```
-
-### Automation: Bubbles Party Mode
-
-```yaml
-automation:
-  - alias: "Spa Party Mode"
-    trigger:
-      - platform: state
-        entity_id: input_boolean.spa_party_mode
-        to: "on"
-    action:
-      - service: switch.turn_on
-        target:
-          entity_id:
-            - switch.hot_tub_bubbles
-            - switch.hot_tub_jets
+        entity_id: switch.hot_tub_filter
 ```
 
 ## Troubleshooting
 
-### Climate shows "unavailable"
+### No Communication
 
-**Check connections:**
-- Verify UART/SPI pins are correct
-- Ensure level shifter is working
-- Check spa cable is connected
+1. Check level shifter is powered and TXS0108E (not TXB0108)
+2. Verify pin assignments match your wiring
+3. Check spa cable connector is fully seated
+4. View logs: `esphome logs bestway-spa.yaml`
 
-**Check logs:**
-```bash
-esphome logs bestway-spa.yaml
+### Commands Don't Work (6-Wire)
+
+For 6-wire models, both CIO and DSP buses must be connected:
+- CIO bus: Read-only monitoring works with just CIO pins
+- DSP bus: Required for sending commands (button presses)
+
+If DSP pins aren't configured, you'll see a warning:
+```
+dsp_data_pin not configured - button control will NOT work!
 ```
 
-Look for:
-- `Setting up Bestway Spa...`
-- `Bestway Spa initialized (Protocol: ...)`
-- Packet receive messages
+### Display Shows "END" (TYPE1)
 
-### No temperature updates
-
-Verify your model selection is correct. Different models have different packet formats.
-
-### Commands don't work
-
-**For 6-wire models:**
-- Check CLK, DATA, CS pin assignments
-- Verify level shifter is bidirectional (TXS0108E, not TXB0108)
-- Some boards need 510-560Ω resistors on signal lines
-
-**For 4-wire models:**
-- Check TX/RX are not swapped
-- Verify baud rate is 9600
-
-### Spa shows random errors
-
-**Level shifter issues:**
-- Use TXS0108E (bidirectional) not TXB0108
-- Add resistors on signal lines if needed
-- Check all solder joints
-
-## Protocol Details
-
-### 4-Wire UART Protocol
-
-**Settings:** 9600 baud, 8N1
-
-**Packet Format (7 bytes):**
+This is the 72-hour hibernate state. With `prevent_hibernate: true` (default), the spa will auto-wake. Check logs for:
 ```
-[0xFF] [CMD] [TEMP] [ERR] [RSV] [CHK] [0xFF]
+Hibernate state detected (display shows END)
+Attempting to wake spa from hibernate (pressing LOCK for 3s)
+Spa woke from hibernate state
 ```
 
-**Command Byte Bits:**
-- Bits vary by model (54123 vs 54138 etc.)
-- Controls heater stages, pump, bubbles, jets
+### Climate Shows Wrong Mode
 
-### 6-Wire SPI-like Protocol
+The VA firmware bug (#919) sent "idle" as a mode instead of an action. This ESPHome implementation correctly:
+- Uses `mode: HEAT` when heater is enabled (stays HEAT even when not actively heating)
+- Uses `action: HEATING` when actively heating
+- Uses `action: IDLE` when at temperature but heater enabled
 
-**TYPE1 (PRE2021, P05504):**
-- 11-byte payload
-- MSB-first transmission
-- Commands: 0x01 (mode), 0x40 (write), 0x42 (read)
-
-**TYPE2 (54149E):**
-- 5-byte payload
-- LSB-first transmission
-- Commands: 0x40, 0xC0, 0x88
-
-### Button Codes (6-Wire TYPE1)
-
-| Button | PRE2021 | P05504 |
-|--------|---------|--------|
-| No Button | 0x1B1B | 0x1B1B |
-| Lock | 0x0200 | 0x0210 |
-| Timer | 0x0100 | 0x0110 |
-| Bubbles | 0x0300 | 0x0310 |
-| Unit | 0x1012 | 0x1022 |
-| Heat | 0x1212 | 0x1222 |
-| Pump | 0x1112 | 0x1122 |
-| Down | 0x1312 | 0x1322 |
-| Up | 0x0809 | 0x081A |
-
-## Development
-
-### Component Structure
+## Component Structure
 
 ```
 components/bestway_spa/
-├── __init__.py         # ESPHome Python config
-├── bestway_spa.h       # C++ header with enums, structs
-└── bestway_spa.cpp     # C++ implementation
+├── __init__.py          # ESPHome component registration
+├── climate.py           # Climate platform schema
+├── switch.py            # Switch platform schema
+├── bestway_spa.h        # Main component header
+├── bestway_spa.cpp      # Main component implementation
+├── enums.h              # Shared enums and structures
+├── ports.h              # GPIO definitions
+├── CIO_TYPE1.h/cpp      # TYPE1 CIO handler (from VA)
+├── DSP_TYPE1.h/cpp      # TYPE1 DSP handler (from VA)
+├── CIO_TYPE2.h/cpp      # TYPE2 CIO handler (from VA)
+├── DSP_TYPE2.h/cpp      # TYPE2 DSP handler (from VA)
+├── CIO_4W.h/cpp         # 4-wire CIO handler (from VA)
+└── DSP_4W.h/cpp         # 4-wire DSP handler (from VA)
 ```
-
-### Building
-
-```bash
-esphome compile bestway-spa.yaml
-```
-
-### Debugging
-
-Use WiFi logging:
-```bash
-esphome logs bestway-spa.yaml --device bestway-spa.local
-```
-
-Set log level in YAML:
-```yaml
-logger:
-  level: VERBOSE  # Shows all packet data
-```
-
-## Comparison: ESPHome vs VisualApproach
-
-| Feature | VisualApproach | This ESPHome |
-|---------|----------------|--------------|
-| MQTT | Required | Not needed |
-| Web UI | Built-in | Via HA |
-| Config | Web interface | YAML |
-| HA Integration | Via MQTT | Native API |
-| OTA Updates | Custom | ESPHome |
-| Logs | Serial only | WiFi logs |
-| Automations | Limited | Full HA |
-| 6-Wire Support | Full | Full |
-| Models Supported | All | All |
-
-## Credits
-
-- **VisualApproach** - Original firmware, hardware design, and protocol documentation
-- **ESPHome** - Framework and tools
-- **Community** - Protocol reverse engineering and testing
 
 ## License
 
-MIT License - See LICENSE file
+This project incorporates code from VisualApproach's WiFi-remote-for-Bestway-Lay-Z-SPA, which is licensed under GPL v3.
 
-## Support
+- Original VisualApproach code: GPL v3
+- ESPHome integration layer: MIT License
 
-- **Issues:** GitHub Issues
-- **Original Hardware:** [VisualApproach GitHub](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA)
+## Links
+
+- [VisualApproach Original Project](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA)
+- [VisualApproach Build Manual](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA/blob/master/bwc-manual.pdf)
+- [ESPHome Documentation](https://esphome.io/)
 
 ## Changelog
 
-### v2.0.0 (2026-01-01)
-- **Complete 6-wire protocol implementation**
-  - TYPE1 support (PRE2021, P05504 models)
-  - TYPE2 support (54149E model)
-  - Full SPI-like bit-banging
-- **All models supported**
-  - 4-wire: 54123, 54138, 54144, 54154, 54173
-  - 6-wire: PRE2021, P05504, 54149E
-- **New features**
-  - Power switch
-  - Jets switch (model-dependent)
-  - Display text sensor
-  - Model-specific button codes
-  - Dual-stage heater control
-- **Improved**
-  - Button queue system for 6-wire
-  - State tracking
-  - Error handling
+### v2.1.0 (2026-01-07)
+- **Anti-hibernate feature** for TYPE1 models (72-hour timer auto-wake)
+- Per-model YAML configuration files
+- Updated documentation with VA credits and architecture details
 
-### v1.0.0 (2026-01-01)
-- Initial release
-- 4-wire UART protocol support
-- Basic climate entity and controls
+### v2.0.0 (2026-01-01)
+- Complete TYPE1, TYPE2, and 4-wire protocol support using VA code
+- MITM dual-bus architecture (CIO + DSP)
+- All Bestway models supported
+- Unit switch (Celsius/Fahrenheit)
+- Button enable/disable controls
+- Fixed climate mode/action (VA bug #919)
+
+### v1.0.0 (2025-12-01)
+- Initial release with basic 4-wire support

@@ -372,7 +372,9 @@ void BestwaySpa::dump_config() {
   ESP_LOGCONFIG(TAG, "  Model: %s", model_str);
   ESP_LOGCONFIG(TAG, "  Has Jets: %s", has_jets() ? "yes" : "no");
   ESP_LOGCONFIG(TAG, "  Has Air: %s", has_air() ? "yes" : "no");
-  ESP_LOGCONFIG(TAG, "  Prevent Hibernate: %s", prevent_hibernate_ ? "yes (auto-wake on END)" : "no");
+  if (protocol_type_ == PROTOCOL_6WIRE_T1) {
+    ESP_LOGCONFIG(TAG, "  Prevent Hibernate: %s", prevent_hibernate_ ? "yes (auto-wake on END)" : "no");
+  }
 
   if (protocol_type_ != PROTOCOL_4WIRE) {
     ESP_LOGCONFIG(TAG, "  MITM Dual-Bus Architecture:");
@@ -1002,13 +1004,22 @@ uint16_t BestwaySpa::get_button_code_(Buttons button) {
 // =============================================================================
 // ANTI-HIBERNATE FEATURE
 // =============================================================================
-// Bestway spas have a 72-hour timer that puts the spa into hibernate mode.
+// Older Bestway spas with the "egg-style" pump (6-wire TYPE1 protocol: PRE2021,
+// P05504) have a 72-hour timer that puts the spa into hibernate mode.
 // When hibernated, the display shows "END" and the spa stops heating/filtering.
 // This feature detects the "END" state and automatically wakes the spa by
 // pressing the lock button for 3 seconds.
+//
+// Note: This 72-hour timer is reportedly only present in older egg-style pumps
+// (TYPE1 protocol). Newer models (TYPE2, 4-wire) may not have this limitation.
 
 void BestwaySpa::check_hibernate_state_() {
   if (!prevent_hibernate_) {
+    return;
+  }
+
+  // Only applies to 6-wire TYPE1 protocol (older egg-style pumps)
+  if (protocol_type_ != PROTOCOL_6WIRE_T1) {
     return;
   }
 
