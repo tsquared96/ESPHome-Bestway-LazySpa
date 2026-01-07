@@ -85,6 +85,7 @@ CONF_ERROR = "error"
 CONF_ERROR_TEXT = "error_text"
 CONF_DISPLAY_TEXT = "display_text"
 CONF_BUTTON_STATUS = "button_status"
+CONF_PREVENT_HIBERNATE = "prevent_hibernate"
 
 
 def validate_6wire_pins(config):

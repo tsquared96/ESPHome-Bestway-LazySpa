@@ -265,6 +265,7 @@ void BestwaySpa::loop() {
   // Update sensors periodically
   if (now - last_sensor_update_ > SENSOR_UPDATE_INTERVAL_MS) {
     update_sensors_();
+    check_hibernate_state_();  // Check for 72-hour hibernate and auto-wake
     last_sensor_update_ = now;
   }
 
@@ -371,6 +372,7 @@ void BestwaySpa::dump_config() {
   ESP_LOGCONFIG(TAG, "  Model: %s", model_str);
   ESP_LOGCONFIG(TAG, "  Has Jets: %s", has_jets() ? "yes" : "no");
   ESP_LOGCONFIG(TAG, "  Has Air: %s", has_air() ? "yes" : "no");
+  ESP_LOGCONFIG(TAG, "  Prevent Hibernate: %s", prevent_hibernate_ ? "yes (auto-wake on END)" : "no");
 
   if (protocol_type_ != PROTOCOL_4WIRE) {
     ESP_LOGCONFIG(TAG, "  MITM Dual-Bus Architecture:");
@@ -996,6 +998,50 @@ uint16_t BestwaySpa::get_button_code_(Buttons button) {
 }
 
 // Character decoding removed - now done by VA's _getChar() method
+
+// =============================================================================
+// ANTI-HIBERNATE FEATURE
+// =============================================================================
+// Bestway spas have a 72-hour timer that puts the spa into hibernate mode.
+// When hibernated, the display shows "END" and the spa stops heating/filtering.
+// This feature detects the "END" state and automatically wakes the spa by
+// pressing the lock button for 3 seconds.
+
+void BestwaySpa::check_hibernate_state_() {
+  if (!prevent_hibernate_) {
+    return;
+  }
+
+  // Check if display shows "END" (hibernate state)
+  bool is_end = (state_.display_chars[0] == 'E' &&
+                 state_.display_chars[1] == 'N' &&
+                 state_.display_chars[2] == 'D');
+
+  if (is_end && !hibernate_detected_) {
+    hibernate_detected_ = true;
+    ESP_LOGW(TAG, "Hibernate state detected (display shows END)");
+    wake_from_hibernate_();
+  } else if (!is_end && hibernate_detected_) {
+    hibernate_detected_ = false;
+    ESP_LOGI(TAG, "Spa woke from hibernate state");
+  }
+}
+
+void BestwaySpa::wake_from_hibernate_() {
+  uint32_t now = millis();
+
+  // Cooldown to prevent rapid repeated wake attempts
+  if (now - hibernate_wake_time_ < HIBERNATE_WAKE_COOLDOWN_MS) {
+    return;
+  }
+
+  hibernate_wake_time_ = now;
+  ESP_LOGI(TAG, "Attempting to wake spa from hibernate (pressing LOCK for 3s)");
+
+  // Queue a 3-second lock button press to wake the spa
+  // The user's documentation says: "press the lock/unlock button for 3 seconds"
+  queue_button_(LOCK, 3000);
+}
 
 // =============================================================================
 // CONTROL METHODS

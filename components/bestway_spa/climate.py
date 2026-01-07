@@ -41,6 +41,8 @@ from . import (
     CONF_ERROR_TEXT,
     CONF_DISPLAY_TEXT,
     CONF_BUTTON_STATUS,
+    # Anti-hibernate config
+    CONF_PREVENT_HIBERNATE,
 )
 
 DEPENDENCIES = ["uart"]
@@ -73,6 +75,9 @@ CONFIG_SCHEMA = cv.All(
         # Protocol configuration
         cv.Optional(CONF_PROTOCOL_TYPE, default="4WIRE"): cv.enum(PROTOCOL_TYPES, upper=True),
         cv.Optional(CONF_MODEL, default="54154"): cv.enum(SPA_MODELS, upper=True),
+
+        # Anti-hibernate: automatically wake spa when 72-hour timer hibernates it
+        cv.Optional(CONF_PREVENT_HIBERNATE, default=True): cv.boolean,
 
         # 6-wire MITM dual-bus pin configuration
         # CIO bus pins (input from pump controller)
@@ -134,6 +139,9 @@ async def to_code(config):
 
     # Set model
     cg.add(var.set_model(config[CONF_MODEL]))
+
+    # Set anti-hibernate option
+    cg.add(var.set_prevent_hibernate(config[CONF_PREVENT_HIBERNATE]))
 
     # Configure 6-wire MITM dual-bus pins
     # CIO bus pins (input from pump controller)

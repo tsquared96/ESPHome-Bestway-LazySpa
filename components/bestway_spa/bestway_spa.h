@@ -220,6 +220,7 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   // Configuration setters
   void set_protocol_type(ProtocolType type) { protocol_type_ = type; }
   void set_model(SpaModel model) { model_ = model; }
+  void set_prevent_hibernate(bool value) { prevent_hibernate_ = value; }
 
   // 6-wire pin configuration - MITM dual-bus architecture
   // CIO bus pins (from pump controller to ESP - input)
@@ -307,6 +308,10 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   void process_button_queue_();
   uint16_t get_button_code_(Buttons button);
 
+  // Anti-hibernate
+  void check_hibernate_state_();
+  void wake_from_hibernate_();
+
   // Character decoding now done by VA's _getChar() method
 
   // Utilities
@@ -392,6 +397,12 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
 
   // Model config
   const ModelConfig4W *model_config_{&CONFIG_54154};
+
+  // Anti-hibernate feature
+  bool prevent_hibernate_{true};  // Default: enabled
+  bool hibernate_detected_{false};
+  uint32_t hibernate_wake_time_{0};
+  static const uint32_t HIBERNATE_WAKE_COOLDOWN_MS = 10000;  // 10 second cooldown between wake attempts
 };
 
 // =============================================================================

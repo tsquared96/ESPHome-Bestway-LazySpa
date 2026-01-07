@@ -69,6 +69,11 @@ climate:
     protocol_type: 6WIRE
     model: PRE2021
 
+    # Anti-hibernate: Bestway spas have a 72-hour timer that puts the spa
+    # into hibernate mode (display shows "END"). This feature auto-wakes
+    # the spa by pressing the lock button for 3 seconds. Default: true
+    prevent_hibernate: true
+
     # CIO bus pins (input from pump controller)
     cio_data_pin: GPIO13   # D7
     cio_clk_pin: GPIO4     # D2
