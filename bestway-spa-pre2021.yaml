@@ -1,7 +1,9 @@
 # =============================================================================
 # Bestway Spa ESPHome Configuration - PRE2021 / P05504 Models
 # =============================================================================
-# For 6-wire TYPE1 protocol spas (pre-2021 models)
+# For 6-wire TYPE1 protocol spas (pre-2021 "egg-style" pump models)
+#
+# Features: Air bubbles only (NO HydroJets on these models)
 #
 # Hardware: ESP8266 D1 Mini with VisualApproach MITM board
 #
