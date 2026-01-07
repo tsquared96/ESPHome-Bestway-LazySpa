@@ -101,6 +101,13 @@ void BestwaySpa::setup() {
       ESP_LOGD(TAG, "Audio pin configured on GPIO%d", audio_gpio);
     }
 
+    // Validate CIO pins before initializing VA handler
+    if (data_pin < 0 || clk_pin < 0 || cs_pin < 0) {
+      ESP_LOGE(TAG, "CIO pins not properly configured! DATA=%d CLK=%d CS=%d", data_pin, clk_pin, cs_pin);
+      ESP_LOGE(TAG, "6-wire protocol requires cio_data_pin, cio_clk_pin, and cio_cs_pin");
+      return;  // Don't proceed with invalid pins - would crash!
+    }
+
     // Initialize CIO handler using VA source (reads from pump controller)
     // VA CIO_TYPE1::setup(data_pin, clk_pin, cs_pin)
     if (protocol_type_ == PROTOCOL_6WIRE_T1) {
