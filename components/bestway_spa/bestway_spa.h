@@ -517,6 +517,7 @@ class BestwaySpaDownButton : public switch_::Switch, public Component {
 class BestwaySpaHeaterBtnEnabled : public switch_::Switch, public Component {
  public:
   void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void setup() override { publish_state(true); }  // Default: enabled
   void write_state(bool state) override {
     parent_->set_button_enabled(HEAT, state);
     publish_state(state);
@@ -528,6 +529,7 @@ class BestwaySpaHeaterBtnEnabled : public switch_::Switch, public Component {
 class BestwaySpaFilterBtnEnabled : public switch_::Switch, public Component {
  public:
   void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void setup() override { publish_state(true); }
   void write_state(bool state) override {
     parent_->set_button_enabled(PUMP, state);
     publish_state(state);
@@ -539,6 +541,7 @@ class BestwaySpaFilterBtnEnabled : public switch_::Switch, public Component {
 class BestwaySpaBubblesBtnEnabled : public switch_::Switch, public Component {
  public:
   void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void setup() override { publish_state(true); }
   void write_state(bool state) override {
     parent_->set_button_enabled(BUBBLES, state);
     publish_state(state);
@@ -550,6 +553,7 @@ class BestwaySpaBubblesBtnEnabled : public switch_::Switch, public Component {
 class BestwaySpaJetsBtnEnabled : public switch_::Switch, public Component {
  public:
   void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void setup() override { publish_state(true); }
   void write_state(bool state) override {
     parent_->set_button_enabled(HYDROJETS, state);
     publish_state(state);
@@ -561,6 +565,7 @@ class BestwaySpaJetsBtnEnabled : public switch_::Switch, public Component {
 class BestwaySpaLockBtnEnabled : public switch_::Switch, public Component {
  public:
   void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void setup() override { publish_state(true); }
   void write_state(bool state) override {
     parent_->set_button_enabled(LOCK, state);
     publish_state(state);
@@ -572,6 +577,7 @@ class BestwaySpaLockBtnEnabled : public switch_::Switch, public Component {
 class BestwaySpaPowerBtnEnabled : public switch_::Switch, public Component {
  public:
   void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void setup() override { publish_state(true); }
   void write_state(bool state) override {
     parent_->set_button_enabled(POWER, state);
     publish_state(state);
@@ -583,6 +589,7 @@ class BestwaySpaPowerBtnEnabled : public switch_::Switch, public Component {
 class BestwaySpaUnitBtnEnabled : public switch_::Switch, public Component {
  public:
   void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void setup() override { publish_state(true); }
   void write_state(bool state) override {
     parent_->set_button_enabled(UNIT, state);
     publish_state(state);
@@ -594,6 +601,7 @@ class BestwaySpaUnitBtnEnabled : public switch_::Switch, public Component {
 class BestwaySpaTimerBtnEnabled : public switch_::Switch, public Component {
  public:
   void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void setup() override { publish_state(true); }
   void write_state(bool state) override {
     parent_->set_button_enabled(TIMER, state);
     publish_state(state);
@@ -605,6 +613,7 @@ class BestwaySpaTimerBtnEnabled : public switch_::Switch, public Component {
 class BestwaySpaUpBtnEnabled : public switch_::Switch, public Component {
  public:
   void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void setup() override { publish_state(true); }
   void write_state(bool state) override {
     parent_->set_button_enabled(UP, state);
     publish_state(state);
@@ -616,6 +625,7 @@ class BestwaySpaUpBtnEnabled : public switch_::Switch, public Component {
 class BestwaySpaDownBtnEnabled : public switch_::Switch, public Component {
  public:
   void set_parent(BestwaySpa *parent) { parent_ = parent; }
+  void setup() override { publish_state(true); }
   void write_state(bool state) override {
     parent_->set_button_enabled(DOWN, state);
     publish_state(state);
