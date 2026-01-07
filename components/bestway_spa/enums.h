@@ -100,14 +100,30 @@ struct sToggles {
     bool down_pressed = false;
 };
 
+// Toggle button indices for 4-wire state machine
+enum ToggleButtons : uint8_t {
+    BUBBLETOGGLE,
+    JETSTOGGLE,
+    PUMPTOGGLE,
+    HEATTOGGLE
+};
+
 // Maximum buttons in queue
-static const uint8_t MAXBUTTONS = 10;
+static const uint8_t MAXBUTTONS = 50;
 
 // Button queue item
 struct sButton_queue_item {
     uint16_t btncode;
+    uint8_t sStates::*p_state;
+    int value;
     int duration_ms;
     uint32_t start_time;
+};
+
+// 7-segment character lookup table
+static const uint8_t CHARS[] = {
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ' ', '-', 'a', 'b', 'c', 'd', 'e', 'f', 'g',
+    'h', 'H', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'x', 'y', 'z'
 };
 
 }  // namespace bestway_va

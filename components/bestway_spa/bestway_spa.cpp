@@ -11,9 +11,13 @@
  */
 
 #include "bestway_spa.h"
-// Use VA source files for 6-wire TYPE1 protocol
+// VA source files for all protocol types
 #include "CIO_TYPE1.h"
 #include "DSP_TYPE1.h"
+#include "CIO_TYPE2.h"
+#include "DSP_TYPE2.h"
+#include "CIO_4W.h"
+#include "DSP_4W.h"
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
 #include <Arduino.h>
@@ -35,20 +39,32 @@ static const uint32_t STATS_INTERVAL_MS = 5000;
 static const uint32_t PACKET_TIMEOUT_MS = 100;
 
 // =============================================================================
-// STATIC INSTANCES FOR 6-WIRE PROTOCOLS (using VA source files)
+// STATIC INSTANCES FOR ALL PROTOCOLS (using VA source files)
 // =============================================================================
 
-// CIO handler instance - using VA PRE2021 implementation
-static bestway_va::CIO_PRE2021 va_cio;
+// 6-wire TYPE1 (PRE2021) - CIO and DSP handlers
+static bestway_va::CIO_PRE2021 va_cio_type1;
+static bestway_va::DSP_PRE2021 va_dsp_type1;
 
-// DSP handler instance - using VA PRE2021 implementation
-static bestway_va::DSP_PRE2021 va_dsp;
+// 6-wire TYPE2 (54149E) - CIO and DSP handlers
+static bestway_va::CIO_54149E va_cio_type2;
+static bestway_va::DSP_54149E va_dsp_type2;
+
+// 4-wire model handlers (allocated dynamically based on model)
+static bestway_va::CIO_4W* va_cio_4w = nullptr;
+static bestway_va::DSP_4W* va_dsp_4w = nullptr;
 
 // Active protocol type
 static bool is_type1 = true;
+static bool is_type2 = false;
+static bool is_4wire = false;
 
 // DSP enabled flag (requires separate DSP pins to be configured)
 static bool dsp_enabled = false;
+
+// Backwards compatibility aliases
+static bestway_va::CIO_PRE2021& va_cio = va_cio_type1;
+static bestway_va::DSP_PRE2021& va_dsp = va_dsp_type1;
 
 // =============================================================================
 // SETUP
@@ -109,19 +125,20 @@ void BestwaySpa::setup() {
     }
 
     // Initialize CIO handler using VA source (reads from pump controller)
-    // VA CIO_TYPE1::setup(data_pin, clk_pin, cs_pin)
     if (protocol_type_ == PROTOCOL_6WIRE_T1) {
       is_type1 = true;
-      va_cio.setup(data_pin, clk_pin, cs_pin);
-
-      // Set initial button code to NOBTN
-      va_cio.setButtonCode(va_cio.getButtonCode(bestway_va::NOBTN));
-
+      is_type2 = false;
+      is_4wire = false;
+      va_cio_type1.setup(data_pin, clk_pin, cs_pin);
+      va_cio_type1.setButtonCode(va_cio_type1.getButtonCode(bestway_va::NOBTN));
       ESP_LOGI(TAG, "6-wire TYPE1 protocol initialized (VA source - PRE2021)");
-    } else {
+    } else if (protocol_type_ == PROTOCOL_6WIRE_T2) {
       is_type1 = false;
-      // TYPE2 not yet implemented in VA files
-      ESP_LOGW(TAG, "TYPE2 protocol not yet implemented in VA files");
+      is_type2 = true;
+      is_4wire = false;
+      va_cio_type2.setup(data_pin, clk_pin, cs_pin);
+      va_cio_type2.setButtonCode(va_cio_type2.getButtonCode(bestway_va::NOBTN));
+      ESP_LOGI(TAG, "6-wire TYPE2 protocol initialized (VA source - 54149E)");
     }
 
     ESP_LOGI(TAG, "  CIO bus (input):  DATA=%d CLK=%d CS=%d", data_pin, clk_pin, cs_pin);
@@ -133,8 +150,11 @@ void BestwaySpa::setup() {
 
     if (dsp_data_gpio >= 0 && dsp_clk_gpio >= 0 && dsp_cs_gpio >= 0) {
       // Full DSP bus configured - enable DSP communication with physical display
-      // VA DSP_TYPE1::setup(data_pin, clk_pin, cs_pin, audio_pin)
-      va_dsp.setup(dsp_data_gpio, dsp_clk_gpio, dsp_cs_gpio, audio_gpio);
+      if (is_type1) {
+        va_dsp_type1.setup(dsp_data_gpio, dsp_clk_gpio, dsp_cs_gpio, audio_gpio);
+      } else if (is_type2) {
+        va_dsp_type2.setup(dsp_data_gpio, dsp_clk_gpio, dsp_cs_gpio, audio_gpio);
+      }
       dsp_enabled = true;
       ESP_LOGI(TAG, "DSP bus (physical display): DATA=%d CLK=%d CS=%d",
                dsp_data_gpio, dsp_clk_gpio, dsp_cs_gpio);
@@ -143,6 +163,51 @@ void BestwaySpa::setup() {
       ESP_LOGW(TAG, "DSP pins not configured - physical display disabled!");
       ESP_LOGW(TAG, "Add dsp_data_pin, dsp_clk_pin, dsp_cs_pin for display");
     }
+  }
+
+  // Initialize 4-wire UART protocol
+  if (protocol_type_ == PROTOCOL_4WIRE) {
+    is_type1 = false;
+    is_type2 = false;
+    is_4wire = true;
+
+    // Allocate the correct model-specific CIO/DSP classes
+    switch (model_) {
+      case MODEL_54123:
+        va_cio_4w = new bestway_va::CIO_54123();
+        va_dsp_4w = new bestway_va::DSP_54123();
+        ESP_LOGI(TAG, "4-wire UART protocol initialized (model 54123)");
+        break;
+      case MODEL_54138:
+        va_cio_4w = new bestway_va::CIO_54138();
+        va_dsp_4w = new bestway_va::DSP_54138();
+        ESP_LOGI(TAG, "4-wire UART protocol initialized (model 54138)");
+        break;
+      case MODEL_54144:
+        va_cio_4w = new bestway_va::CIO_54144();
+        va_dsp_4w = new bestway_va::DSP_54144();
+        ESP_LOGI(TAG, "4-wire UART protocol initialized (model 54144)");
+        break;
+      case MODEL_54154:
+        va_cio_4w = new bestway_va::CIO_54154();
+        va_dsp_4w = new bestway_va::DSP_54154();
+        ESP_LOGI(TAG, "4-wire UART protocol initialized (model 54154)");
+        break;
+      case MODEL_54173:
+        va_cio_4w = new bestway_va::CIO_54173();
+        va_dsp_4w = new bestway_va::DSP_54173();
+        ESP_LOGI(TAG, "4-wire UART protocol initialized (model 54173)");
+        break;
+      default:
+        va_cio_4w = new bestway_va::CIO_54154();
+        va_dsp_4w = new bestway_va::DSP_54154();
+        ESP_LOGW(TAG, "Unknown 4-wire model, defaulting to 54154");
+        break;
+    }
+
+    // 4-wire uses ESPHome UART, setup is handled differently
+    // The actual UART setup happens via ESPHome's uart component
+    ESP_LOGI(TAG, "4-wire UART mode - using ESPHome UART component");
   }
 
   // Initialize climate state
@@ -182,9 +247,10 @@ void BestwaySpa::loop() {
 
     // Update the button code in the active CIO handler (VA classes)
     if (is_type1) {
-      va_cio.setButtonCode(current_button_code_);
+      va_cio_type1.setButtonCode(current_button_code_);
+    } else if (is_type2) {
+      va_cio_type2.setButtonCode(current_button_code_);
     }
-    // TYPE2 not yet implemented
   }
 
   // Handle toggle requests from HA
@@ -204,24 +270,47 @@ void BestwaySpa::loop() {
 
   // Log statistics periodically
   if (now - last_stats_time_ > STATS_INTERVAL_MS) {
-    if (protocol_type_ != PROTOCOL_4WIRE && is_type1) {
-      uint32_t pkt_delta = va_cio.good_packets_count - last_pkt_count_;
-      uint32_t bad_packets = va_cio.bad_packets_count;
+    if (is_type1) {
+      uint32_t pkt_delta = va_cio_type1.good_packets_count - last_pkt_count_;
+      uint32_t bad_packets = va_cio_type1.bad_packets_count;
 
       if (dsp_enabled) {
         ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | DSP: pkts=%lu | Btn:0x%04X",
-                 (unsigned long)va_cio.good_packets_count, (unsigned long)pkt_delta,
+                 (unsigned long)va_cio_type1.good_packets_count, (unsigned long)pkt_delta,
                  (unsigned long)bad_packets,
-                 (unsigned long)va_dsp.good_packets_count,
+                 (unsigned long)va_dsp_type1.good_packets_count,
                  current_button_code_);
       } else {
         ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | Btn:0x%04X",
-                 (unsigned long)va_cio.good_packets_count, (unsigned long)pkt_delta,
+                 (unsigned long)va_cio_type1.good_packets_count, (unsigned long)pkt_delta,
                  (unsigned long)bad_packets,
                  current_button_code_);
       }
+      last_pkt_count_ = va_cio_type1.good_packets_count;
+    } else if (is_type2) {
+      uint32_t pkt_delta = va_cio_type2.good_packets_count - last_pkt_count_;
+      uint32_t bad_packets = va_cio_type2.bad_packets_count;
 
-      last_pkt_count_ = va_cio.good_packets_count;
+      if (dsp_enabled) {
+        ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | DSP: pkts=%lu | Btn:0x%04X",
+                 (unsigned long)va_cio_type2.good_packets_count, (unsigned long)pkt_delta,
+                 (unsigned long)bad_packets,
+                 (unsigned long)va_dsp_type2.good_packets_count,
+                 current_button_code_);
+      } else {
+        ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | Btn:0x%04X",
+                 (unsigned long)va_cio_type2.good_packets_count, (unsigned long)pkt_delta,
+                 (unsigned long)bad_packets,
+                 current_button_code_);
+      }
+      last_pkt_count_ = va_cio_type2.good_packets_count;
+    } else if (is_4wire && va_cio_4w) {
+      uint32_t pkt_delta = va_cio_4w->good_packets_count - last_pkt_count_;
+      ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | writes=%d",
+               (unsigned long)va_cio_4w->good_packets_count, (unsigned long)pkt_delta,
+               (unsigned long)va_cio_4w->bad_packets_count,
+               va_cio_4w->write_msg_count);
+      last_pkt_count_ = va_cio_4w->good_packets_count;
     }
     last_stats_time_ = now;
   }
@@ -498,23 +587,33 @@ void BestwaySpa::send_4wire_response_() {
 // =============================================================================
 
 void BestwaySpa::handle_6wire_protocol_() {
-  if (!is_type1) {
-    // TYPE2 not yet implemented
-    return;
-  }
-
   // =========================================================================
   // STEP 1: cio->updateStates() - Process CIO packets received via ISR
   // The ISR fills _payload buffer, updateStates() parses it into cio_states
   // =========================================================================
-  va_cio.updateStates();
+
+  // Call the appropriate updateStates() based on protocol
+  const bestway_va::sStates* cio_ptr = nullptr;
+  uint32_t current_good_packets = 0;
+
+  if (is_type1) {
+    va_cio_type1.updateStates();
+    cio_ptr = &va_cio_type1.cio_states;
+    current_good_packets = va_cio_type1.good_packets_count;
+  } else if (is_type2) {
+    va_cio_type2.updateStates();
+    cio_ptr = &va_cio_type2.cio_states;
+    current_good_packets = va_cio_type2.good_packets_count;
+  } else {
+    return;  // Unknown protocol
+  }
 
   // Check if we got new packet(s) by comparing packet count
-  if (va_cio.good_packets_count > good_packets_) {
-    good_packets_ = va_cio.good_packets_count;
+  if (current_good_packets > good_packets_) {
+    good_packets_ = current_good_packets;
 
-    // Copy VA cio_states to our SpaState
-    const bestway_va::sStates& cio = va_cio.cio_states;
+    // Reference to the active CIO states
+    const bestway_va::sStates& cio = *cio_ptr;
 
     // Parse into pending state for debouncing
     SpaState new_state;
@@ -594,11 +693,15 @@ void BestwaySpa::handle_6wire_protocol_() {
   // =========================================================================
   if (dsp_enabled) {
     // Copy CIO states to DSP (this is what VA does)
-    va_dsp.dsp_states = va_cio.cio_states;
-    va_dsp.dsp_states.brightness = state_.brightness;  // Allow HA override
-
-    // Send to physical display at ~20Hz (rate-limited inside handleStates)
-    va_dsp.handleStates();
+    if (is_type1) {
+      va_dsp_type1.dsp_states = va_cio_type1.cio_states;
+      va_dsp_type1.dsp_states.brightness = state_.brightness;
+      va_dsp_type1.handleStates();
+    } else if (is_type2) {
+      va_dsp_type2.dsp_states = va_cio_type2.cio_states;
+      va_dsp_type2.dsp_states.brightness = state_.brightness;
+      va_dsp_type2.handleStates();
+    }
   }
 
   // =========================================================================
@@ -607,7 +710,12 @@ void BestwaySpa::handle_6wire_protocol_() {
   // Otherwise floating DSP pins will read as garbage button presses
   // =========================================================================
   if (dsp_enabled && good_packets_ > 0) {
-    bestway_va::Buttons button = va_dsp.getPressedButton();
+    bestway_va::Buttons button = bestway_va::NOBTN;
+    if (is_type1) {
+      button = va_dsp_type1.getPressedButton();
+    } else if (is_type2) {
+      button = va_dsp_type2.getPressedButton();
+    }
 
     if (button != bestway_va::NOBTN) {
       ESP_LOGI(TAG, "Physical display button: %d", button);
