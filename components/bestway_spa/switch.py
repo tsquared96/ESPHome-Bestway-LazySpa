@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import switch
-from esphome.const import CONF_ID, CONF_TYPE
+from esphome.const import CONF_ID
 
 from . import bestway_spa_ns, BestwaySpa, CONF_BESTWAY_SPA_ID
 
@@ -29,73 +29,104 @@ BestwaySpaTimerBtnEnabled = bestway_spa_ns.class_("BestwaySpaTimerBtnEnabled", s
 BestwaySpaUpBtnEnabled = bestway_spa_ns.class_("BestwaySpaUpBtnEnabled", switch.Switch, cg.Component)
 BestwaySpaDownBtnEnabled = bestway_spa_ns.class_("BestwaySpaDownBtnEnabled", switch.Switch, cg.Component)
 
-SWITCH_TYPES = {
-    "heater": BestwaySpaHeaterSwitch,
-    "filter": BestwaySpaFilterSwitch,
-    "bubbles": BestwaySpaBubblesSwitch,
-    "jets": BestwaySpaJetsSwitch,
-    "lock": BestwaySpaLockSwitch,
-    "power": BestwaySpaPowerSwitch,
-    "unit": BestwaySpaUnitSwitch,
-    "timer": BestwaySpaTimerSwitch,
-    "up": BestwaySpaUpButton,
-    "down": BestwaySpaDownButton,
-    # Button enable switches
-    "heater_btn_enabled": BestwaySpaHeaterBtnEnabled,
-    "filter_btn_enabled": BestwaySpaFilterBtnEnabled,
-    "bubbles_btn_enabled": BestwaySpaBubblesBtnEnabled,
-    "jets_btn_enabled": BestwaySpaJetsBtnEnabled,
-    "lock_btn_enabled": BestwaySpaLockBtnEnabled,
-    "power_btn_enabled": BestwaySpaPowerBtnEnabled,
-    "unit_btn_enabled": BestwaySpaUnitBtnEnabled,
-    "timer_btn_enabled": BestwaySpaTimerBtnEnabled,
-    "up_btn_enabled": BestwaySpaUpBtnEnabled,
-    "down_btn_enabled": BestwaySpaDownBtnEnabled,
-}
+# Configuration keys
+CONF_HEATER = "heater"
+CONF_FILTER = "filter"
+CONF_BUBBLES = "bubbles"
+CONF_JETS = "jets"
+CONF_LOCK = "lock"
+CONF_POWER = "power"
+CONF_UNIT = "unit"
+CONF_TIMER = "timer"
+CONF_UP = "up"
+CONF_DOWN = "down"
+CONF_HEATER_BTN_ENABLED = "heater_btn_enabled"
+CONF_FILTER_BTN_ENABLED = "filter_btn_enabled"
+CONF_BUBBLES_BTN_ENABLED = "bubbles_btn_enabled"
+CONF_JETS_BTN_ENABLED = "jets_btn_enabled"
+CONF_LOCK_BTN_ENABLED = "lock_btn_enabled"
+CONF_POWER_BTN_ENABLED = "power_btn_enabled"
+CONF_UNIT_BTN_ENABLED = "unit_btn_enabled"
+CONF_TIMER_BTN_ENABLED = "timer_btn_enabled"
+CONF_UP_BTN_ENABLED = "up_btn_enabled"
+CONF_DOWN_BTN_ENABLED = "down_btn_enabled"
+CONF_SPA_ID = "spa_id"
 
+# Multi-switch platform schema
+# Usage:
+#   switch:
+#     - platform: bestway_spa
+#       spa_id: spa
+#       heater:
+#         name: "Heater"
+#       filter:
+#         name: "Filter"
+#       # jets: omitted if model doesn't have jets
 
-def _create_switch_schema(switch_class):
-    """Create a schema for a specific switch type."""
-    return (
-        switch.switch_schema(switch_class)
-        .extend({
-            cv.GenerateID(): cv.declare_id(switch_class),
-            cv.GenerateID(CONF_BESTWAY_SPA_ID): cv.use_id(BestwaySpa),
-        })
-        .extend(cv.COMPONENT_SCHEMA)
-    )
+CONFIG_SCHEMA = cv.Schema({
+    cv.GenerateID(CONF_SPA_ID): cv.use_id(BestwaySpa),
 
+    # Control switches (only configure what your model has)
+    cv.Optional(CONF_HEATER): switch.switch_schema(BestwaySpaHeaterSwitch).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_FILTER): switch.switch_schema(BestwaySpaFilterSwitch).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_BUBBLES): switch.switch_schema(BestwaySpaBubblesSwitch).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_JETS): switch.switch_schema(BestwaySpaJetsSwitch).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_LOCK): switch.switch_schema(BestwaySpaLockSwitch).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_POWER): switch.switch_schema(BestwaySpaPowerSwitch).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_UNIT): switch.switch_schema(BestwaySpaUnitSwitch).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_TIMER): switch.switch_schema(BestwaySpaTimerSwitch).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_UP): switch.switch_schema(BestwaySpaUpButton).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_DOWN): switch.switch_schema(BestwaySpaDownButton).extend(cv.COMPONENT_SCHEMA),
 
-# Use typed_schema to properly declare ID types for each switch type
-CONFIG_SCHEMA = cv.typed_schema({
-    "heater": _create_switch_schema(BestwaySpaHeaterSwitch),
-    "filter": _create_switch_schema(BestwaySpaFilterSwitch),
-    "bubbles": _create_switch_schema(BestwaySpaBubblesSwitch),
-    "jets": _create_switch_schema(BestwaySpaJetsSwitch),
-    "lock": _create_switch_schema(BestwaySpaLockSwitch),
-    "power": _create_switch_schema(BestwaySpaPowerSwitch),
-    "unit": _create_switch_schema(BestwaySpaUnitSwitch),
-    "timer": _create_switch_schema(BestwaySpaTimerSwitch),
-    "up": _create_switch_schema(BestwaySpaUpButton),
-    "down": _create_switch_schema(BestwaySpaDownButton),
-    # Button enable switches
-    "heater_btn_enabled": _create_switch_schema(BestwaySpaHeaterBtnEnabled),
-    "filter_btn_enabled": _create_switch_schema(BestwaySpaFilterBtnEnabled),
-    "bubbles_btn_enabled": _create_switch_schema(BestwaySpaBubblesBtnEnabled),
-    "jets_btn_enabled": _create_switch_schema(BestwaySpaJetsBtnEnabled),
-    "lock_btn_enabled": _create_switch_schema(BestwaySpaLockBtnEnabled),
-    "power_btn_enabled": _create_switch_schema(BestwaySpaPowerBtnEnabled),
-    "unit_btn_enabled": _create_switch_schema(BestwaySpaUnitBtnEnabled),
-    "timer_btn_enabled": _create_switch_schema(BestwaySpaTimerBtnEnabled),
-    "up_btn_enabled": _create_switch_schema(BestwaySpaUpBtnEnabled),
-    "down_btn_enabled": _create_switch_schema(BestwaySpaDownBtnEnabled),
+    # Button enable/disable switches
+    cv.Optional(CONF_HEATER_BTN_ENABLED): switch.switch_schema(BestwaySpaHeaterBtnEnabled).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_FILTER_BTN_ENABLED): switch.switch_schema(BestwaySpaFilterBtnEnabled).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_BUBBLES_BTN_ENABLED): switch.switch_schema(BestwaySpaBubblesBtnEnabled).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_JETS_BTN_ENABLED): switch.switch_schema(BestwaySpaJetsBtnEnabled).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_LOCK_BTN_ENABLED): switch.switch_schema(BestwaySpaLockBtnEnabled).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_POWER_BTN_ENABLED): switch.switch_schema(BestwaySpaPowerBtnEnabled).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_UNIT_BTN_ENABLED): switch.switch_schema(BestwaySpaUnitBtnEnabled).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_TIMER_BTN_ENABLED): switch.switch_schema(BestwaySpaTimerBtnEnabled).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_UP_BTN_ENABLED): switch.switch_schema(BestwaySpaUpBtnEnabled).extend(cv.COMPONENT_SCHEMA),
+    cv.Optional(CONF_DOWN_BTN_ENABLED): switch.switch_schema(BestwaySpaDownBtnEnabled).extend(cv.COMPONENT_SCHEMA),
 })
 
 
-async def to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID])
-    await cg.register_component(var, config)
-    await switch.register_switch(var, config)
+async def _register_switch(config, key, switch_class, parent):
+    """Helper to register a switch if configured."""
+    if key not in config:
+        return
 
-    parent = await cg.get_variable(config[CONF_BESTWAY_SPA_ID])
+    conf = config[key]
+    var = cg.new_Pvariable(conf[CONF_ID])
+    await cg.register_component(var, conf)
+    await switch.register_switch(var, conf)
     cg.add(var.set_parent(parent))
+
+
+async def to_code(config):
+    parent = await cg.get_variable(config[CONF_SPA_ID])
+
+    # Register control switches
+    await _register_switch(config, CONF_HEATER, BestwaySpaHeaterSwitch, parent)
+    await _register_switch(config, CONF_FILTER, BestwaySpaFilterSwitch, parent)
+    await _register_switch(config, CONF_BUBBLES, BestwaySpaBubblesSwitch, parent)
+    await _register_switch(config, CONF_JETS, BestwaySpaJetsSwitch, parent)
+    await _register_switch(config, CONF_LOCK, BestwaySpaLockSwitch, parent)
+    await _register_switch(config, CONF_POWER, BestwaySpaPowerSwitch, parent)
+    await _register_switch(config, CONF_UNIT, BestwaySpaUnitSwitch, parent)
+    await _register_switch(config, CONF_TIMER, BestwaySpaTimerSwitch, parent)
+    await _register_switch(config, CONF_UP, BestwaySpaUpButton, parent)
+    await _register_switch(config, CONF_DOWN, BestwaySpaDownButton, parent)
+
+    # Register button enable switches
+    await _register_switch(config, CONF_HEATER_BTN_ENABLED, BestwaySpaHeaterBtnEnabled, parent)
+    await _register_switch(config, CONF_FILTER_BTN_ENABLED, BestwaySpaFilterBtnEnabled, parent)
+    await _register_switch(config, CONF_BUBBLES_BTN_ENABLED, BestwaySpaBubblesBtnEnabled, parent)
+    await _register_switch(config, CONF_JETS_BTN_ENABLED, BestwaySpaJetsBtnEnabled, parent)
+    await _register_switch(config, CONF_LOCK_BTN_ENABLED, BestwaySpaLockBtnEnabled, parent)
+    await _register_switch(config, CONF_POWER_BTN_ENABLED, BestwaySpaPowerBtnEnabled, parent)
+    await _register_switch(config, CONF_UNIT_BTN_ENABLED, BestwaySpaUnitBtnEnabled, parent)
+    await _register_switch(config, CONF_TIMER_BTN_ENABLED, BestwaySpaTimerBtnEnabled, parent)
+    await _register_switch(config, CONF_UP_BTN_ENABLED, BestwaySpaUpBtnEnabled, parent)
+    await _register_switch(config, CONF_DOWN_BTN_ENABLED, BestwaySpaDownBtnEnabled, parent)
