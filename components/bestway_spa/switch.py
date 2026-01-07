@@ -64,7 +64,7 @@ CONF_SPA_ID = "spa_id"
 #       # jets: omitted if model doesn't have jets
 
 CONFIG_SCHEMA = cv.Schema({
-    cv.GenerateID(CONF_SPA_ID): cv.use_id(BestwaySpa),
+    cv.Required(CONF_SPA_ID): cv.use_id(BestwaySpa),
 
     # Control switches (only configure what your model has)
     cv.Optional(CONF_HEATER): switch.switch_schema(BestwaySpaHeaterSwitch).extend(cv.COMPONENT_SCHEMA),
