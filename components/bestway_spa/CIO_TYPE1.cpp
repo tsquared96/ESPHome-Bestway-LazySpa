@@ -67,7 +67,7 @@ CIO_TYPE1::CIO_TYPE1() {
     _received_byte = 0;
     _CIO_cmd_matches = 0;
     _new_packet_available = false;
-    _send_bit = 0;
+    _send_bit = 8;
     _brightness = 7;
     _packet_error = 0;
     _packet_transm_active = false;
@@ -231,8 +231,8 @@ void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
     bool clockstate = digitalRead(_CLK_PIN);
 #endif
 
-    // Rising edge: shift out button bits (trying rising edge output)
-    if (clockstate && _data_is_output) {
+    // Falling edge: shift out button bits (per VA)
+    if (!clockstate && _data_is_output) {
         button_bits_sent++;  // Debug: count bits transmitted
         if (_button_code & (1 << _send_bit)) {
 #ifdef ESP8266
@@ -271,9 +271,9 @@ void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
                     _packet_error |= 4;
                 }
             }
-            // Check for button read request - try LOW byte first
+            // Check for button read request - match VA exactly
             else if (_received_byte == DSP_CMD2_DATAREAD) {
-                _send_bit = 0;  // Start at bit 0 (low byte first)
+                _send_bit = 8;  // Start at bit 8 (HIGH byte first per VA)
                 _data_is_output = true;
                 cmd_read_count++;  // Debug
                 last_btn_transmitted = _button_code;  // Debug
@@ -283,10 +283,17 @@ void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
                 }
 #ifdef ESP8266
                 WRITE_PERI_REG(PIN_DIR_OUTPUT, 1 << _DATA_PIN);
+                // Output first bit IMMEDIATELY (don't wait for clock edge)
+                if (_button_code & (1 << _send_bit)) {
+                    WRITE_PERI_REG(PIN_OUT_SET, 1 << _DATA_PIN);
+                } else {
+                    WRITE_PERI_REG(PIN_OUT_CLEAR, 1 << _DATA_PIN);
+                }
 #else
                 pinMode(_DATA_PIN, OUTPUT);
+                digitalWrite(_DATA_PIN, (_button_code & (1 << _send_bit)) ? 1 : 0);
 #endif
-                // Do NOT output immediately - first falling edge will output bit 0
+                _send_bit++;  // Next bit will be 9
             }
         }
     }
