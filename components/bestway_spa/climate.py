@@ -13,7 +13,7 @@ PROTOCOL_TYPES = {
     "4WIRE": ProtocolType.PROTOCOL_4WIRE,
 }
 
-# 2025.12.5 approach: climate_schema() is a function, not a variable.
+# 2025.12.5 MANDATORY: Use climate_schema function, NOT CLIMATE_SCHEMA
 CONFIG_SCHEMA = climate.climate_schema(BestwaySpa).extend(
     {
         cv.Required("protocol_type"): cv.enum(PROTOCOL_TYPES, upper=True),
