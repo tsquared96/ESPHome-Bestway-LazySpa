@@ -279,17 +279,12 @@ void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
                 last_btn_transmitted = _button_code;  // Debug: track what we're sending
 #ifdef ESP8266
                 WRITE_PERI_REG(PIN_DIR_OUTPUT, 1 << _DATA_PIN);
-                // Immediately output first bit (bit 0) - don't wait for falling edge
-                if (_button_code & (1 << 0)) {
-                    WRITE_PERI_REG(PIN_OUT_SET, 1 << _DATA_PIN);
-                } else {
-                    WRITE_PERI_REG(PIN_OUT_CLEAR, 1 << _DATA_PIN);
-                }
 #else
                 pinMode(_DATA_PIN, OUTPUT);
-                digitalWrite(_DATA_PIN, (_button_code & 1) ? 1 : 0);
 #endif
-                _send_bit = 1;  // Start at bit 1 since we already output bit 0
+                // VA sends HIGH byte first: bits 8-15, then 0-7
+                // Wait for first falling edge to output - do NOT output immediately
+                _send_bit = 8;
             }
         }
     }
