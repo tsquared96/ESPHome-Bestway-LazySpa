@@ -231,9 +231,8 @@ void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
     bool clockstate = digitalRead(_CLK_PIN);
 #endif
 
-    // Falling edge: shift out button bits (per VA docs: "shift out on falling edge")
-    // LSB first per VA docs
-    if (!clockstate && _data_is_output) {
+    // Rising edge: shift out button bits (trying rising edge output)
+    if (clockstate && _data_is_output) {
         button_bits_sent++;  // Debug: count bits transmitted
         if (_button_code & (1 << _send_bit)) {
 #ifdef ESP8266
@@ -252,7 +251,7 @@ void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
         if (_send_bit > 15) _send_bit = 0;
     }
 
-    // Rising edge: latch/read data bits (per VA docs: "latch on rising edge")
+    // Rising edge: latch/read data bits (this is working correctly)
     if (clockstate && !_data_is_output) {
 #ifdef ESP8266
         _received_byte = (_received_byte >> 1) | (((READ_PERI_REG(PIN_IN) & (1 << _DATA_PIN)) > 0) << 7);
