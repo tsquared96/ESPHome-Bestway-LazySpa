@@ -2,7 +2,9 @@
 
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
+#ifdef USE_UART
 #include "esphome/components/uart/uart.h"
+#endif
 #include "esphome/components/climate/climate.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
@@ -206,7 +208,7 @@ class BestwaySpaLockSwitch;
 class BestwaySpaPowerSwitch;
 class BestwaySpaUnitSwitch;
 
-class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Component {
+class BestwaySpa : public climate::Climate, public Component {
  public:
   void setup() override;
   void loop() override;
@@ -221,6 +223,11 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   void set_protocol_type(ProtocolType type) { protocol_type_ = type; }
   void set_model(SpaModel model) { model_ = model; }
   void set_prevent_hibernate(bool value) { prevent_hibernate_ = value; }
+
+#ifdef USE_UART
+  // UART parent setter (for 4-wire protocol)
+  void set_uart_parent(uart::UARTComponent *parent) { uart_parent_ = parent; }
+#endif
 
   // 6-wire pin configuration - MITM dual-bus architecture
   // CIO bus pins (from pump controller to ESP - input)
@@ -403,6 +410,17 @@ class BestwaySpa : public climate::Climate, public uart::UARTDevice, public Comp
   bool hibernate_detected_{false};
   uint32_t hibernate_wake_time_{0};
   static const uint32_t HIBERNATE_WAKE_COOLDOWN_MS = 10000;  // 10 second cooldown between wake attempts
+
+#ifdef USE_UART
+  // UART parent for 4-wire protocol (replaces UARTDevice inheritance)
+  uart::UARTComponent *uart_parent_{nullptr};
+
+  // UART wrapper methods (only for 4-wire)
+  int available() { return uart_parent_ ? uart_parent_->available() : 0; }
+  bool read_byte(uint8_t *data) { return uart_parent_ ? uart_parent_->read_byte(data) : false; }
+  void write_array(const uint8_t *data, size_t len) { if (uart_parent_) uart_parent_->write_array(data, len); }
+  void flush() { if (uart_parent_) uart_parent_->flush(); }
+#endif
 };
 
 // =============================================================================

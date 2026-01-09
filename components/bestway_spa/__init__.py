@@ -11,9 +11,9 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import climate, switch
 
-# No global DEPENDENCIES - UART config is only required for 4-wire protocols
-# But we AUTO_LOAD uart so the header is available (C++ includes it unconditionally)
-AUTO_LOAD = ["sensor", "binary_sensor", "text_sensor", "uart"]
+# No global DEPENDENCIES - UART is conditionally included in C++ header
+# Only loaded when user has uart: section in their config (for 4-wire)
+AUTO_LOAD = ["sensor", "binary_sensor", "text_sensor"]
 
 # =============================================================================
 # NAMESPACE DEFINITIONS
