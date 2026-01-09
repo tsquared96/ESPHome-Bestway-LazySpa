@@ -67,7 +67,7 @@ CIO_TYPE1::CIO_TYPE1() {
     _received_byte = 0;
     _CIO_cmd_matches = 0;
     _new_packet_available = false;
-    _send_bit = 8;
+    _send_bit = 0;
     _brightness = 7;
     _packet_error = 0;
     _packet_transm_active = false;
@@ -272,9 +272,9 @@ void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
                     _packet_error |= 4;
                 }
             }
-            // Check for button read request - EXACTLY match VA behavior
+            // Check for button read request - try LOW byte first
             else if (_received_byte == DSP_CMD2_DATAREAD) {
-                _send_bit = 8;  // Start at bit 8 (high byte first)
+                _send_bit = 0;  // Start at bit 0 (low byte first)
                 _data_is_output = true;
                 cmd_read_count++;  // Debug
                 last_btn_transmitted = _button_code;  // Debug
@@ -287,7 +287,7 @@ void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
 #else
                 pinMode(_DATA_PIN, OUTPUT);
 #endif
-                // Do NOT output immediately - first falling edge will output bit 8
+                // Do NOT output immediately - first falling edge will output bit 0
             }
         }
     }
