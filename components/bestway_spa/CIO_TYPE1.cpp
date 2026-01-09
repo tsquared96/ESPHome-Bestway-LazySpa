@@ -273,7 +273,7 @@ void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
             }
             // Check for button read request
             else if (_received_byte == DSP_CMD2_DATAREAD) {
-                _send_bit = 8;
+                _send_bit = 0;  // Try starting at bit 0 (low byte first)
                 _data_is_output = true;
                 cmd_read_count++;  // Debug: count 0x42 commands received
                 last_btn_transmitted = _button_code;  // Debug: track what we're sending
