@@ -45,7 +45,7 @@ class BestwaySpa : public climate::Climate, public Component {
   climate::ClimateTraits traits() override;
   void control(const climate::ClimateCall &call) override;
 
-  // Configuration setters
+  // Configuration setters for Pins
   void set_protocol_type(ProtocolType type) { protocol_type_ = type; }
   void set_cio_data_pin(InternalGPIOPin *pin) { cio_data_pin_ = pin; }
   void set_cio_clk_pin(InternalGPIOPin *pin) { cio_clk_pin_ = pin; }
@@ -54,6 +54,15 @@ class BestwaySpa : public climate::Climate, public Component {
   void set_dsp_clk_pin(InternalGPIOPin *pin) { dsp_clk_pin_ = pin; }
   void set_dsp_cs_pin(InternalGPIOPin *pin) { dsp_cs_pin_ = pin; }
   void set_audio_pin(InternalGPIOPin *pin) { audio_pin_ = pin; }
+
+  // Configuration setters for Sensors (Required by climate.py)
+  void set_current_temperature_sensor(sensor::Sensor *s) { current_temp_sensor_ = s; }
+  void set_target_temperature_sensor(sensor::Sensor *s) { target_temp_sensor_ = s; }
+  void set_power_sensor(binary_sensor::BinarySensor *s) { power_sensor_ = s; }
+  void set_heating_sensor(binary_sensor::BinarySensor *s) { heating_sensor_ = s; }
+  void set_filter_sensor(binary_sensor::BinarySensor *s) { filter_sensor_ = s; }
+  void set_bubbles_sensor(binary_sensor::BinarySensor *s) { bubbles_sensor_ = s; }
+  void set_display_text_sensor(text_sensor::TextSensor *s) { display_text_sensor_ = s; }
 
   // Public method for the lambda buttons in your YAML
   void on_button_press_(Buttons btn);
@@ -65,9 +74,9 @@ class BestwaySpa : public climate::Climate, public Component {
 
   // VA Drivers
   bestway_va::CIO_PRE2021 va_cio_type1;
-  bestway_va::DSP_TYPE1 va_dsp_type1; // Fixed: Matches class name in DSP_TYPE1.h
+  bestway_va::DSP_TYPE1 va_dsp_type1; 
 
-  // Pins
+  // Pin Pointers
   ProtocolType protocol_type_{PROTOCOL_6WIRE_T1};
   InternalGPIOPin *cio_clk_pin_{nullptr};
   InternalGPIOPin *cio_data_pin_{nullptr};
@@ -77,14 +86,18 @@ class BestwaySpa : public climate::Climate, public Component {
   InternalGPIOPin *dsp_cs_pin_{nullptr};
   InternalGPIOPin *audio_pin_{nullptr};
 
+  // Sensor Pointers
+  sensor::Sensor *current_temp_sensor_{nullptr};
+  sensor::Sensor *target_temp_sensor_{nullptr};
+  binary_sensor::BinarySensor *power_sensor_{nullptr};
+  binary_sensor::BinarySensor *heating_sensor_{nullptr};
+  binary_sensor::BinarySensor *filter_sensor_{nullptr};
+  binary_sensor::BinarySensor *bubbles_sensor_{nullptr};
+  text_sensor::TextSensor *display_text_sensor_{nullptr};
+
   // Internal State
   SpaState state_;
   bool dsp_enabled_{false};
-  bestway_va::Buttons last_physical_btn_{bestway_va::NOBTN};
-  uint32_t last_pkt_count_{0};
-  uint32_t last_update_{0};
-  uint32_t last_button_time_{0};
-  
   std::queue<Buttons> button_queue_;
   uint16_t current_button_code_{0x1B1B};
 };
