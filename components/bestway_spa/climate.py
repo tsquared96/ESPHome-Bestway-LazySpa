@@ -13,7 +13,8 @@ PROTOCOL_TYPES = {
     "4WIRE": ProtocolType.PROTOCOL_4WIRE,
 }
 
-# 2025.12.5 MANDATORY: Use climate_schema function, NOT CLIMATE_SCHEMA
+# 2025.12.5 Fix: Using climate.climate_schema(BestwaySpa).extend handles the base
+# and this direct extension allows the pins to exist at the top level of the platform.
 CONFIG_SCHEMA = climate.climate_schema(BestwaySpa).extend(
     {
         cv.Required("protocol_type"): cv.enum(PROTOCOL_TYPES, upper=True),
