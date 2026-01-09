@@ -13,19 +13,18 @@ PROTOCOL_TYPES = {
     "4WIRE": ProtocolType.PROTOCOL_4WIRE,
 }
 
-# 2025.12.5 Fix: Using climate.climate_schema(BestwaySpa).extend handles the base
-# and this direct extension allows the pins to exist at the top level of the platform.
+# 2025.12.5 Fix: Use pins.internal_gpio_input_pin_schema for internal GPIO pins
 CONFIG_SCHEMA = climate.climate_schema(BestwaySpa).extend(
     {
         cv.Required("protocol_type"): cv.enum(PROTOCOL_TYPES, upper=True),
         # CIO Pins
-        cv.Required("cio_data_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
-        cv.Required("cio_clk_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
-        cv.Required("cio_cs_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
+        cv.Required("cio_data_pin"): pins.internal_gpio_input_pin_schema,
+        cv.Required("cio_clk_pin"): pins.internal_gpio_input_pin_schema,
+        cv.Required("cio_cs_pin"): pins.internal_gpio_input_pin_schema,
         # DSP Pins
-        cv.Optional("dsp_data_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
-        cv.Optional("dsp_clk_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
-        cv.Optional("dsp_cs_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
+        cv.Optional("dsp_data_pin"): pins.internal_gpio_input_pin_schema,
+        cv.Optional("dsp_clk_pin"): pins.internal_gpio_input_pin_schema,
+        cv.Optional("dsp_cs_pin"): pins.internal_gpio_input_pin_schema,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
