@@ -7,8 +7,6 @@ namespace bestway_spa {
 static const char *const TAG = "bestway_spa";
 
 void BestwaySpa::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up Bestway Spa Climate...");
-
   if (this->protocol_type_ == PROTOCOL_6WIRE_T1) {
     this->va_cio_type1.setup(
       this->cio_data_pin_->get_pin(),
@@ -17,7 +15,7 @@ void BestwaySpa::setup() {
     );
   }
 
-  if (this->dsp_data_pin_ != nullptr && this->dsp_clk_pin_ != nullptr && this->dsp_cs_pin_ != nullptr) {
+  if (this->dsp_data_pin_ != nullptr) {
     this->va_dsp_type1.setup(
       this->dsp_data_pin_->get_pin(),
       this->dsp_clk_pin_->get_pin(),
@@ -34,7 +32,6 @@ void BestwaySpa::loop() {
   }
 }
 
-// RESTORED: This was missing and caused compilation failure
 void BestwaySpa::on_button_press_(ButtonCode code) {
   if (this->protocol_type_ == PROTOCOL_6WIRE_T1) {
     this->va_cio_type1.setButtonCode(static_cast<uint8_t>(code));
@@ -45,16 +42,22 @@ void BestwaySpa::update_sensors() {
   float target = this->va_cio_type1.get_target_temp();
   float current = this->va_cio_type1.get_current_temp();
 
-  if (target > 0) this->target_temperature = target;
-  if (current > 0) this->current_temperature = current;
-  
-  if (this->va_cio_type1.is_heating()) {
-    this->mode = climate::CLIMATE_MODE_HEAT;
-    this->action = climate::CLIMATE_ACTION_HEATING;
-  } else {
-    this->mode = climate::CLIMATE_MODE_OFF;
-    this->action = climate::CLIMATE_ACTION_IDLE;
+  if (target > 0) {
+    this->target_temperature = target;
+    if (this->target_temp_sensor_ != nullptr) {
+      this->target_temp_sensor_->publish_state(target);
+    }
   }
+  
+  if (current > 0) {
+    this->current_temperature = current;
+    if (this->current_temp_sensor_ != nullptr) {
+      this->current_temp_sensor_->publish_state(current);
+    }
+  }
+
+  this->mode = this->va_cio_type1.is_heating() ? climate::CLIMATE_MODE_HEAT : climate::CLIMATE_MODE_OFF;
+  this->action = this->va_cio_type1.is_heating() ? climate::CLIMATE_ACTION_HEATING : climate::CLIMATE_ACTION_IDLE;
   
   this->publish_state();
 }
