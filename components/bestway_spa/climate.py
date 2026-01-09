@@ -13,10 +13,13 @@ PROTOCOL_TYPES = {
     "4WIRE": ProtocolType.PROTOCOL_4WIRE,
 }
 
-# Use the climate_schema() FUNCTION instead of a global variable.
-# This is the most reliable way in 2025.x versions.
-CONFIG_SCHEMA = climate.climate_schema(BestwaySpa).extend(
+# 2025.12.5 Strategy: 
+# 1. Use climate.CLIMATE_SCHEMA as a base (handles id, name, icon)
+# 2. Extend it with your custom pins and settings
+# 3. Use climate_schema function inside to_code
+CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
     {
+        cv.GenerateID(): cv.declare_id(BestwaySpa),
         cv.Required("protocol_type"): cv.enum(PROTOCOL_TYPES, upper=True),
         # CIO Pins
         cv.Required("cio_data_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
@@ -36,7 +39,7 @@ async def to_code(config):
 
     cg.add(var.set_protocol_type(config["protocol_type"]))
     
-    # CIO Pin Setup
+    # Use gpio_pin_expression for pins
     cio_data = await cg.gpio_pin_expression(config["cio_data_pin"])
     cg.add(var.set_cio_data_pin(cio_data))
     cio_clk = await cg.gpio_pin_expression(config["cio_clk_pin"])
@@ -44,7 +47,6 @@ async def to_code(config):
     cio_cs = await cg.gpio_pin_expression(config["cio_cs_pin"])
     cg.add(var.set_cio_cs_pin(cio_cs))
 
-    # DSP Pin Setup
     if "dsp_data_pin" in config:
         dsp_data = await cg.gpio_pin_expression(config["dsp_data_pin"])
         cg.add(var.set_dsp_data_pin(dsp_data))
