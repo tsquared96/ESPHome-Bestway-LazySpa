@@ -13,9 +13,9 @@ PROTOCOL_TYPES = {
     "4WIRE": ProtocolType.PROTOCOL_4WIRE,
 }
 
-CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
+# Fixed for ESPHome 2024.x/2025.x - Using climate_schema function
+CONFIG_SCHEMA = climate.climate_schema(BestwaySpa).extend(
     {
-        cv.GenerateID(): cv.declare_id(BestwaySpa),
         cv.Required("protocol_type"): cv.enum(PROTOCOL_TYPES, upper=True),
         # CIO Pins
         cv.Required("cio_data_pin"): pins.internal_gpio_pin_number,
