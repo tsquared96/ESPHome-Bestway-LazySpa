@@ -13,23 +13,21 @@ PROTOCOL_TYPES = {
     "4WIRE": ProtocolType.PROTOCOL_4WIRE,
 }
 
-# Use cv.Schema directly to avoid the climate_schema dictionary inheritance issues
-CONFIG_SCHEMA = cv.All(
-    climate.CLIMATE_SCHEMA.extend(
-        {
-            cv.GenerateID(): cv.declare_id(BestwaySpa),
-            cv.Required("protocol_type"): cv.enum(PROTOCOL_TYPES, upper=True),
-            # CIO Pins
-            cv.Required("cio_data_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
-            cv.Required("cio_clk_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
-            cv.Required("cio_cs_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
-            # DSP Pins
-            cv.Optional("dsp_data_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
-            cv.Optional("dsp_clk_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
-            cv.Optional("dsp_cs_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
-        }
-    ).extend(cv.COMPONENT_SCHEMA),
-)
+# CLIMATE_PLATFORM_SCHEMA is the stable way to extend climate in 2025.12
+CONFIG_SCHEMA = climate.CLIMATE_PLATFORM_SCHEMA.extend(
+    {
+        cv.GenerateID(): cv.declare_id(BestwaySpa),
+        cv.Required("protocol_type"): cv.enum(PROTOCOL_TYPES, upper=True),
+        # CIO Pins
+        cv.Required("cio_data_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
+        cv.Required("cio_clk_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
+        cv.Required("cio_cs_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
+        # DSP Pins
+        cv.Optional("dsp_data_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
+        cv.Optional("dsp_clk_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
+        cv.Optional("dsp_cs_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
+    }
+).extend(cv.COMPONENT_SCHEMA)
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
