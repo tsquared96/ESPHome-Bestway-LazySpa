@@ -6,10 +6,8 @@ namespace bestway_spa {
 
 static const char *const TAG = "bestway_spa";
 
-// Initialize the static instance
 BestwaySpa *BestwaySpa::instance = nullptr;
 
-// Interrupt Service Routine wrappers
 void IRAM_ATTR BestwaySpa::cio_clk_intr() { instance->va_cio_type1.isr_clkHandler(); }
 void IRAM_ATTR BestwaySpa::cio_cs_intr()  { instance->va_cio_type1.isr_packetHandler(); }
 void IRAM_ATTR BestwaySpa::dsp_clk_intr() { instance->va_dsp_type1.isr_clkHandler(); }
@@ -57,21 +55,43 @@ void BestwaySpa::setup() {
 void BestwaySpa::loop() {
   if (this->protocol_type_ == PROTOCOL_6WIRE_T1) {
     this->va_cio_type1.updateStates();
+    
     if (this->dsp_enabled_) {
       this->va_dsp_type1.handleStates();
+      
+      if (this->display_text_sensor_ != nullptr) {
+        std::string current_text = this->va_dsp_type1.dsp_states.display_text;
+        if (this->display_text_sensor_->state != current_text) {
+          this->display_text_sensor_->publish_state(current_text);
+        }
+      }
     }
 
-    // Sync state to ESPHome sensors
+    // Sync state to Climate and Sensors
     float cur_temp = (float)this->va_cio_type1.cio_states.temperature;
     float tar_temp = (float)this->va_cio_type1.cio_states.target;
 
     this->current_temperature = cur_temp;
     this->target_temperature = tar_temp;
 
-    if (this->current_temp_sensor_ != nullptr) this->current_temp_sensor_->publish_state(cur_temp);
-    if (this->target_temp_sensor_ != nullptr) this->target_temp_sensor_->publish_state(tar_temp);
+    // Update Sensors only on change
+    if (this->current_temp_sensor_ != nullptr && this->current_temp_sensor_->state != cur_temp)
+        this->current_temp_sensor_->publish_state(cur_temp);
+    
+    if (this->target_temp_sensor_ != nullptr && this->target_temp_sensor_->state != tar_temp)
+        this->target_temp_sensor_->publish_state(tar_temp);
 
-    // Button Queue Handling
+    // Sync Binary Sensors
+    if (this->heating_sensor_ != nullptr)
+        this->heating_sensor_->publish_state(this->va_cio_type1.cio_states.heater);
+    
+    if (this->filter_sensor_ != nullptr)
+        this->filter_sensor_->publish_state(this->va_cio_type1.cio_states.filter);
+
+    if (this->bubbles_sensor_ != nullptr)
+        this->bubbles_sensor_->publish_state(this->va_cio_type1.cio_states.bubbles);
+
+    // Button Queue
     if (!this->button_queue_.empty()) {
         Buttons btn = this->button_queue_.front();
         uint16_t code = this->va_cio_type1.getButtonCode(btn);
@@ -86,7 +106,7 @@ void BestwaySpa::loop() {
 
 climate::ClimateTraits BestwaySpa::traits() {
   auto traits = climate::ClimateTraits();
-  traits.set_supports_current_temperature(true);
+  traits.add_supported_feature(climate::CLIMATE_SUPPORT_CURRENT_TEMPERATURE);
   traits.set_visual_min_temperature(20);
   traits.set_visual_max_temperature(40);
   traits.set_visual_temperature_step(1);
