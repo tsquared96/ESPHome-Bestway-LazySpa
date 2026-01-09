@@ -474,6 +474,7 @@ void BestwaySpa::control(const climate::ClimateCall &call) {
 // 4-WIRE UART PROTOCOL HANDLER
 // =============================================================================
 
+#ifdef USE_UART
 void BestwaySpa::handle_4wire_protocol_() {
   while (available()) {
     uint8_t byte;
@@ -579,6 +580,14 @@ void BestwaySpa::send_4wire_response_() {
   write_array(packet, 7);
   flush();
 }
+#else
+// Stub implementations when UART is not available (6-wire only builds)
+void BestwaySpa::handle_4wire_protocol_() {
+  ESP_LOGE(TAG, "4-wire protocol requires UART configuration!");
+}
+void BestwaySpa::parse_4wire_packet_(const std::vector<uint8_t> &packet) {}
+void BestwaySpa::send_4wire_response_() {}
+#endif  // USE_UART
 
 // =============================================================================
 // 6-WIRE PROTOCOL HANDLER - Uses VA source files directly
