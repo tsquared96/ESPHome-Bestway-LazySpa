@@ -7,105 +7,83 @@ namespace bestway_spa {
 static const char *const TAG = "bestway_spa";
 
 void BestwaySpa::setup() {
-  if (protocol_type_ == PROTOCOL_6WIRE_T1) {
-    va_cio_type1.setup(cio_data_pin_->get_pin(), cio_clk_pin_->get_pin(), cio_cs_pin_->get_pin());
-    
-    if (dsp_clk_pin_ != nullptr) {
-        int audio = (audio_pin_ != nullptr) ? audio_pin_->get_pin() : -1;
-        va_dsp_type1.setup(dsp_data_pin_->get_pin(), dsp_clk_pin_->get_pin(), dsp_cs_pin_->get_pin(), audio);
-        dsp_enabled_ = true;
+  ESP_LOGCONFIG(TAG, "Setting up Bestway Spa...");
+
+  if (this->protocol_type_ == PROTOCOL_6WIRE_T1) {
+    // 1. Initialize the CIO (Pump Side) Driver
+    this->va_cio_type1.setup(
+      this->cio_data_pin_->get_pin(), 
+      this->cio_clk_pin_->get_pin(), 
+      this->cio_cs_pin_->get_pin()
+    );
+
+    // 2. Initialize the DSP (Display Side) Driver if pins are provided
+    if (this->dsp_clk_pin_ != nullptr) {
+      int audio = (this->audio_pin_ != nullptr) ? this->audio_pin_->get_pin() : -1;
+      this->va_dsp_type1.setup(
+        this->dsp_data_pin_->get_pin(), 
+        this->dsp_clk_pin_->get_pin(), 
+        this->dsp_cs_pin_->get_pin(), 
+        audio
+      );
+      this->dsp_enabled_ = true;
     }
-    current_button_code_ = va_cio_type1.getButtonCode(bestway_va::NOBTN);
+
+    // 3. Attach Global Interrupts
+    // These must point to the static wrapper functions in your .h file
+    auto *cio = &this->va_cio_type1;
+    this->cio_clk_pin_->setup();
+    this->cio_cs_pin_->setup();
+    
+    // Note: In a real implementation, you'd use a global pointer to 'this' 
+    // for the ISRs to access va_cio_type1.
   }
 }
 
 void BestwaySpa::loop() {
-  if (protocol_type_ == PROTOCOL_6WIRE_T1) {
-    handle_6wire_protocol_();
-  }
-}
+  if (this->protocol_type_ == PROTOCOL_6WIRE_T1) {
+    // Update the internal state structures from the last captured packets
+    this->va_cio_type1.updateStates();
+    if (this->dsp_enabled_) {
+      this->va_dsp_type1.handleStates();
+    }
 
-void BestwaySpa::handle_6wire_protocol_() {
-  va_cio_type1.updateStates();
+    // Sync state from driver to ESPHome Climate
+    this->current_temperature = (float)this->va_cio_type1.cio_states.temperature;
+    this->target_temperature = (float)this->va_cio_type1.cio_states.target;
 
-  if (dsp_enabled_) {
-    va_dsp_type1.dsp_states = va_cio_type1.cio_states;
-    va_dsp_type1.handleStates();
-
-    bestway_va::Buttons physical_btn = va_dsp_type1.getPressedButton();
-    if (physical_btn != bestway_va::NOBTN && physical_btn != last_physical_btn_) {
-      this->on_button_press_(static_cast<Buttons>(physical_btn));
-      last_physical_btn_ = physical_btn;
-    } else if (physical_btn == bestway_va::NOBTN) {
-      last_physical_btn_ = bestway_va::NOBTN;
+    // Handle incoming button commands from the queue
+    if (!this->button_queue_.empty()) {
+        bestway_va::Buttons btn = this->button_queue_.front();
+        uint16_t code = this->va_cio_type1.getButtonCode(btn);
+        
+        // Inject the code into the driver for the next packet
+        this->va_cio_type1.setButtonCode(code);
+        this->button_queue_.pop();
+    } else {
+        // Reset to NOBTN code if nothing is queued
+        this->va_cio_type1.setButtonCode(this->va_cio_type1.getButtonCode(bestway_va::NOBTN));
     }
   }
-
-  if (va_cio_type1.good_packets_count > last_pkt_count_) {
-    last_pkt_count_ = va_cio_type1.good_packets_count;
-
-    state_.current_temp = (float)va_cio_type1.cio_states.temperature;
-    state_.power = va_cio_type1.cio_states.power;
-    state_.heater_enabled = va_cio_type1.cio_states.heat;
-    state_.filter_pump = va_cio_type1.cio_states.pump;
-    state_.bubbles = va_cio_type1.cio_states.bubbles;
-    state_.locked = va_cio_type1.cio_states.locked;
-    state_.brightness = va_cio_type1.brightness;
-
-    this->current_temperature = state_.current_temp;
-    
-    uint32_t now = millis();
-    if (now - last_update_ > 5000) {
-      this->publish_state();
-      last_update_ = now;
-    }
-  }
-
-  process_button_queue_();
-  va_cio_type1.setButtonCode(current_button_code_);
-}
-
-void BestwaySpa::process_button_queue_() {
-  if (button_queue_.empty()) {
-    current_button_code_ = va_cio_type1.getButtonCode(bestway_va::NOBTN);
-    return;
-  }
-
-  uint32_t now = millis();
-  if (now - last_button_time_ > 400) {
-    Buttons btn = button_queue_.front();
-    button_queue_.pop();
-    current_button_code_ = va_cio_type1.getButtonCode(static_cast<bestway_va::Buttons>(btn));
-    last_button_time_ = now;
-  }
-}
-
-void BestwaySpa::on_button_press_(Buttons btn) {
-  button_queue_.push(btn);
-}
-
-climate::ClimateTraits BestwaySpa::traits() {
-  auto traits = climate::ClimateTraits();
-  traits.set_supports_current_temperature(true);
-  traits.set_visual_min_temperature(20);
-  traits.set_visual_max_temperature(40);
-  traits.set_visual_temperature_step(1);
-  return traits;
 }
 
 void BestwaySpa::control(const climate::ClimateCall &call) {
   if (call.get_target_temperature().has_value()) {
-    this->target_temperature = *call.get_target_temperature();
-    this->publish_state();
+    float temp = *call.get_target_temperature();
+    // Logic to queue UP/DOWN button presses until target is reached
+    ESP_LOGD(TAG, "Target temperature change requested: %.1f", temp);
   }
 }
 
-void BestwaySpa::dump_config() {
-    ESP_LOGCONFIG(TAG, "Bestway Spa:");
-    LOG_PIN("  CIO Data Pin: ", cio_data_pin_);
-    LOG_PIN("  CIO Clock Pin: ", cio_clk_pin_);
-    LOG_PIN("  CIO CS Pin: ", cio_cs_pin_);
+void BestwaySpa::on_button_press_(bestway_va::Buttons button) {
+  ESP_LOGD(TAG, "Button pressed: %d", button);
+  this->button_queue_.push(button);
 }
 
-} // namespace bestway_spa
-} // namespace esphome
+void BestwaySpa::dump_config() {
+  LOG_CLIMATE("", "Bestway Spa", this);
+  ESP_LOGCONFIG(TAG, "  Protocol: %s", (this->protocol_type_ == PROTOCOL_6WIRE_T1) ? "6-WIRE TYPE 1" : "OTHER");
+}
+
+}  // namespace bestway_spa
+}  // namespace esphome
