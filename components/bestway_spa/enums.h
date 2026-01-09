@@ -1,19 +1,9 @@
-/**
- * Enums and structures for Bestway Spa control
- *
- * Adapted from VisualApproach WiFi-remote-for-Bestway-Lay-Z-SPA
- * https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA
- *
- * Original work Copyright (c) visualapproach
- * Licensed under GPL v3
- */
-
 #pragma once
 #include <Arduino.h>
 
 namespace bestway_va {
 
-// Button indices - matches VisualApproach
+// Button indices - Updated to match the logic in CIO_TYPE1.cpp
 enum Buttons : uint8_t {
     NOBTN = 0,
     LOCK,
@@ -22,43 +12,11 @@ enum Buttons : uint8_t {
     UNIT,
     HEAT,
     PUMP,
-    DOWN,
-    UP,
+    TEMP_DOWN,  // Renamed from DOWN to match driver logic
+    TEMP_UP,    // Renamed from UP to match driver logic
     POWER,
     HYDROJETS,
     BTN_COUNT
-};
-
-// State indices
-enum States : uint8_t {
-    LOCKEDSTATE = 0,
-    POWERSTATE,
-    UNITSTATE,
-    BUBBLESSTATE,
-    HEATGRNSTATE,
-    HEATREDSTATE,
-    HEATSTATE,
-    PUMPSTATE,
-    TEMPERATURE,
-    TARGET,
-    CHAR1,
-    CHAR2,
-    CHAR3,
-    JETSSTATE,
-    ERROR
-};
-
-// Model types
-enum Models : uint8_t {
-    PRE2021,
-    MIAMI2021,
-    MALDIVES2021,
-    M54149E,
-    M54173,
-    M54154,
-    M54144,
-    M54138,
-    M54123
 };
 
 // State structure - matches VA sStates
@@ -82,28 +40,10 @@ struct sStates {
     uint8_t timerled2 = 0;
     uint8_t timerbuttonled = 0;
     uint8_t brightness = 8;
+    
     // 4-wire specific fields
-    bool godmode = false;           // 4-wire: ESP has full control
-    uint8_t no_of_heater_elements_on = 2;  // 4-wire: heater element count
-};
-
-// Toggle requests structure - matches VA sToggles
-struct sToggles {
-    Buttons pressed_button = NOBTN;
-    uint8_t target = 20;
-    bool locked_pressed = false;
-    bool power_change = false;
-    bool unit_change = false;
-    bool bubbles_change = false;
-    bool heat_change = false;
-    bool pump_change = false;
-    bool jets_change = false;
-    bool timer_pressed = false;
-    bool up_pressed = false;
-    bool down_pressed = false;
-    // 4-wire specific fields
-    bool godmode = false;           // 4-wire: ESP has full control
-    uint8_t no_of_heater_elements_on = 2;  // 4-wire: heater element count
+    bool godmode = false;
+    uint8_t no_of_heater_elements_on = 2;
 };
 
 // Toggle button indices for 4-wire state machine
@@ -112,24 +52,6 @@ enum ToggleButtons : uint8_t {
     JETSTOGGLE,
     PUMPTOGGLE,
     HEATTOGGLE
-};
-
-// Maximum buttons in queue
-static const uint8_t MAXBUTTONS = 50;
-
-// Button queue item
-struct sButton_queue_item {
-    uint16_t btncode;
-    uint8_t sStates::*p_state;
-    int value;
-    int duration_ms;
-    uint32_t start_time;
-};
-
-// 7-segment character lookup table
-static const uint8_t CHARS[] = {
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ' ', '-', 'a', 'b', 'c', 'd', 'e', 'f', 'g',
-    'h', 'H', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'x', 'y', 'z'
 };
 
 }  // namespace bestway_va
