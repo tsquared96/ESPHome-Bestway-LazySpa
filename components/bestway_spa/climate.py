@@ -13,10 +13,10 @@ PROTOCOL_TYPES = {
     "4WIRE": ProtocolType.PROTOCOL_4WIRE,
 }
 
-# CLIMATE_PLATFORM_SCHEMA is the stable way to extend climate in 2025.12
-CONFIG_SCHEMA = climate.CLIMATE_PLATFORM_SCHEMA.extend(
+# Use the climate_schema() FUNCTION instead of a global variable.
+# This is the most reliable way in 2025.x versions.
+CONFIG_SCHEMA = climate.climate_schema(BestwaySpa).extend(
     {
-        cv.GenerateID(): cv.declare_id(BestwaySpa),
         cv.Required("protocol_type"): cv.enum(PROTOCOL_TYPES, upper=True),
         # CIO Pins
         cv.Required("cio_data_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
