@@ -274,12 +274,14 @@ void BestwaySpa::loop() {
     if (is_type1) {
       uint32_t pkt_delta = va_cio_type1.good_packets_count - last_pkt_count_;
       uint32_t bad_packets = va_cio_type1.bad_packets_count;
+      uint16_t dsp_raw_btn = (va_dsp_type1._raw_payload_from_dsp[0] << 8) | va_dsp_type1._raw_payload_from_dsp[1];
 
       if (dsp_enabled) {
-        ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | DSP: pkts=%lu | Btn:0x%04X | 0x42:%lu bits:%lu",
+        ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | DSP: pkts=%lu raw=0x%04X | Btn:0x%04X | 0x42:%lu bits:%lu",
                  (unsigned long)va_cio_type1.good_packets_count, (unsigned long)pkt_delta,
                  (unsigned long)bad_packets,
                  (unsigned long)va_dsp_type1.good_packets_count,
+                 dsp_raw_btn,
                  current_button_code_,
                  (unsigned long)va_cio_type1.cmd_read_count,
                  (unsigned long)va_cio_type1.button_bits_sent);
