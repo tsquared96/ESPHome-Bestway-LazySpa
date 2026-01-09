@@ -67,21 +67,18 @@ void BestwaySpa::loop() {
       }
     }
 
-    // Sync state to Climate and Sensors
     float cur_temp = (float)this->va_cio_type1.cio_states.temperature;
     float tar_temp = (float)this->va_cio_type1.cio_states.target;
 
     this->current_temperature = cur_temp;
     this->target_temperature = tar_temp;
 
-    // Update Sensors only on change
     if (this->current_temp_sensor_ != nullptr && this->current_temp_sensor_->state != cur_temp)
         this->current_temp_sensor_->publish_state(cur_temp);
     
     if (this->target_temp_sensor_ != nullptr && this->target_temp_sensor_->state != tar_temp)
         this->target_temp_sensor_->publish_state(tar_temp);
 
-    // Sync Binary Sensors
     if (this->heating_sensor_ != nullptr)
         this->heating_sensor_->publish_state(this->va_cio_type1.cio_states.heater);
     
@@ -91,7 +88,6 @@ void BestwaySpa::loop() {
     if (this->bubbles_sensor_ != nullptr)
         this->bubbles_sensor_->publish_state(this->va_cio_type1.cio_states.bubbles);
 
-    // Button Queue
     if (!this->button_queue_.empty()) {
         Buttons btn = this->button_queue_.front();
         uint16_t code = this->va_cio_type1.getButtonCode(btn);
@@ -115,7 +111,14 @@ climate::ClimateTraits BestwaySpa::traits() {
 
 void BestwaySpa::control(const climate::ClimateCall &call) {
   if (call.get_target_temperature().has_value()) {
-    ESP_LOGD(TAG, "Target temperature set to %.1f", *call.get_target_temperature());
+    float new_target = *call.get_target_temperature();
+    float current_target = (float)this->va_cio_type1.cio_states.target;
+    
+    if (new_target > current_target) {
+        this->on_button_press_(bestway_va::TEMP_UP);
+    } else if (new_target < current_target) {
+        this->on_button_press_(bestway_va::TEMP_DOWN);
+    }
   }
 }
 
