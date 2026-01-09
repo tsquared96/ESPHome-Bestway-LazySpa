@@ -58,17 +58,33 @@ void BestwaySpa::update_sensors() {
 
   this->mode = this->va_cio_type1.is_heating() ? climate::CLIMATE_MODE_HEAT : climate::CLIMATE_MODE_OFF;
   this->action = this->va_cio_type1.is_heating() ? climate::CLIMATE_ACTION_HEATING : climate::CLIMATE_ACTION_IDLE;
-  
+
+  // Publish binary sensor states
+  if (this->heating_sensor_ != nullptr) {
+    this->heating_sensor_->publish_state(this->va_cio_type1.is_heating());
+  }
+  if (this->filter_sensor_ != nullptr) {
+    this->filter_sensor_->publish_state(this->va_cio_type1.is_filtering());
+  }
+  if (this->bubbles_sensor_ != nullptr) {
+    this->bubbles_sensor_->publish_state(this->va_cio_type1.is_bubbles());
+  }
+
+  // Publish display text
+  if (this->display_text_sensor_ != nullptr) {
+    this->display_text_sensor_->publish_state(this->va_cio_type1.get_display());
+  }
+
   this->publish_state();
 }
 
 climate::ClimateTraits BestwaySpa::traits() {
   auto traits = climate::ClimateTraits();
-  traits.set_supports_current_temperature(true);
+  traits.add_supported_mode(climate::CLIMATE_MODE_OFF);
+  traits.add_supported_mode(climate::CLIMATE_MODE_HEAT);
   traits.set_visual_min_temperature(20);
   traits.set_visual_max_temperature(40);
   traits.set_visual_temperature_step(1.0f);
-  traits.set_supported_modes({climate::CLIMATE_MODE_OFF, climate::CLIMATE_MODE_HEAT});
   return traits;
 }
 

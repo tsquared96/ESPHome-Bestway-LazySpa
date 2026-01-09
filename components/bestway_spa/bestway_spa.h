@@ -3,6 +3,8 @@
 #include "esphome/core/component.h"
 #include "esphome/components/climate/climate.h"
 #include "esphome/components/sensor/sensor.h"
+#include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome/components/text_sensor/text_sensor.h"
 #include "CIO_TYPE1.h"
 #include "DSP_TYPE1.h"
 #include "enums.h"
@@ -31,6 +33,14 @@ class BestwaySpa : public climate::Climate, public Component {
   void set_current_temperature_sensor(sensor::Sensor *sens) { current_temp_sensor_ = sens; }
   void set_target_temperature_sensor(sensor::Sensor *sens) { target_temp_sensor_ = sens; }
 
+  // Binary sensor setters used by binary_sensor.py
+  void set_heating_sensor(binary_sensor::BinarySensor *sens) { heating_sensor_ = sens; }
+  void set_filter_sensor(binary_sensor::BinarySensor *sens) { filter_sensor_ = sens; }
+  void set_bubbles_sensor(binary_sensor::BinarySensor *sens) { bubbles_sensor_ = sens; }
+
+  // Text sensor setters used by text_sensor.py
+  void set_display_text_sensor(text_sensor::TextSensor *sens) { display_text_sensor_ = sens; }
+
   // Logic bridge
   void on_button_press_(ButtonCode code);
 
@@ -50,6 +60,12 @@ class BestwaySpa : public climate::Climate, public Component {
 
   sensor::Sensor *current_temp_sensor_{nullptr};
   sensor::Sensor *target_temp_sensor_{nullptr};
+
+  binary_sensor::BinarySensor *heating_sensor_{nullptr};
+  binary_sensor::BinarySensor *filter_sensor_{nullptr};
+  binary_sensor::BinarySensor *bubbles_sensor_{nullptr};
+
+  text_sensor::TextSensor *display_text_sensor_{nullptr};
 
   CIO_TYPE1 va_cio_type1;
   DSP_TYPE1 va_dsp_type1;
