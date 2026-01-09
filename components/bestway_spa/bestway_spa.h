@@ -35,7 +35,6 @@ struct SpaState {
 
 class BestwaySpa : public climate::Climate, public Component {
  public:
-  // Static instance for interrupt handling on ESP8266
   static BestwaySpa *instance;
   static void IRAM_ATTR cio_clk_intr();
   static void IRAM_ATTR cio_cs_intr();
@@ -50,7 +49,7 @@ class BestwaySpa : public climate::Climate, public Component {
   climate::ClimateTraits traits() override;
   void control(const climate::ClimateCall &call) override;
 
-  // Setters
+  // Setters for Pins
   void set_protocol_type(ProtocolType type) { protocol_type_ = type; }
   void set_cio_data_pin(InternalGPIOPin *pin) { cio_data_pin_ = pin; }
   void set_cio_clk_pin(InternalGPIOPin *pin) { cio_clk_pin_ = pin; }
@@ -60,6 +59,7 @@ class BestwaySpa : public climate::Climate, public Component {
   void set_dsp_cs_pin(InternalGPIOPin *pin) { dsp_cs_pin_ = pin; }
   void set_audio_pin(InternalGPIOPin *pin) { audio_pin_ = pin; }
 
+  // Setters for Sensors
   void set_current_temperature_sensor(sensor::Sensor *s) { current_temp_sensor_ = s; }
   void set_target_temperature_sensor(sensor::Sensor *s) { target_temp_sensor_ = s; }
   void set_power_sensor(binary_sensor::BinarySensor *s) { power_sensor_ = s; }
