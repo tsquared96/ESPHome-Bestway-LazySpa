@@ -1,40 +1,41 @@
-#ifndef DSP_TYPE1_H
-#define DSP_TYPE1_H
+#pragma once
 
-#include <Arduino.h>
-#include "ports.h"
-#include "bestway_va_types.h"
+#include "esphome/core/component.h"
+#include "esphome/core/hal.h"
+#include "enums.h" // Fixed: Replaced non-existent bestway_va_types.h
 
-namespace bestway_va {
+namespace esphome {
+namespace bestway_spa {
 
-// The DSP driver handles communication to the physical Display panel
 class DSP_TYPE1 {
-public:
-    void setup(uint8_t data_pin, uint8_t clk_pin, uint8_t cs_pin, int audio_pin);
-    void handleStates();
-    
-    // Interrupt Handlers
-    void IRAM_ATTR isr_clkHandler();
-    void IRAM_ATTR isr_packetHandler();
+ public:
+  DSP_TYPE1() {}
+  void setup(uint8_t data_pin, uint8_t clk_pin, uint8_t cs_pin, uint8_t audio_pin);
+  
+  // Handlers called by ISR
+  void IRAM_ATTR isr_clkHandler();
+  
+  // State getters
+  uint8_t getPressedButton();
+  bool has_new_packet() { return _new_packet_available; }
+  void clear_packet_flag() { _new_packet_available = false; }
 
-    struct {
-        char display_text[5]; // e.g., " 38", "FIL", "END"
-        bool power_led;
-        bool heater_led;
-    } dsp_states;
+ protected:
+  // Uppercase to match the DSP_TYPE1.cpp implementation
+  uint8_t _DATA_PIN;
+  uint8_t _CLK_PIN;
+  uint8_t _CS_PIN;
+  uint8_t _AUDIO_PIN;
 
-private:
-    uint8_t _data_pin, _clk_pin, _cs_pin;
-    int _audio_pin;
-    uint32_t _data_mask, _clk_mask, _cs_mask;
+  uint8_t _byte_count = 0;
+  uint8_t _bit_count = 0;
+  uint8_t _received_byte = 0;
+  bool _packet_transm_active = false;
+  bool _new_packet_available = false;
 
-    volatile uint16_t _captured_words[10];
-    volatile uint8_t _bit_idx = 0;
-    volatile uint8_t _word_idx = 0;
-    
-    char _getChar(uint16_t code);
+  uint8_t _payload[11] = {0};
+  uint8_t _last_btn = 0;
 };
 
-} // namespace bestway_va
-
-#endif
+}  // namespace bestway_spa
+}  // namespace esphome
