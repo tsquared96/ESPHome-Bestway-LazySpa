@@ -272,19 +272,18 @@ void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
                     _packet_error |= 4;
                 }
             }
-            // Check for button read request
+            // Check for button read request - EXACTLY match VA behavior
             else if (_received_byte == DSP_CMD2_DATAREAD) {
+                _send_bit = 8;  // Start at bit 8 (high byte first)
                 _data_is_output = true;
-                cmd_read_count++;  // Debug: count 0x42 commands received
-                last_btn_transmitted = _button_code;  // Debug: track what we're sending
+                cmd_read_count++;  // Debug
+                last_btn_transmitted = _button_code;  // Debug
 #ifdef ESP8266
                 WRITE_PERI_REG(PIN_DIR_OUTPUT, 1 << _DATA_PIN);
 #else
                 pinMode(_DATA_PIN, OUTPUT);
 #endif
-                // VA sends HIGH byte first: bits 8-15, then 0-7
-                // Wait for first falling edge to output - do NOT output immediately
-                _send_bit = 8;
+                // Do NOT output immediately - first falling edge will output bit 8
             }
         }
     }
