@@ -82,6 +82,9 @@ struct sStates {
     uint8_t timerled2 = 0;
     uint8_t timerbuttonled = 0;
     uint8_t brightness = 8;
+    // 4-wire specific fields
+    bool godmode = false;           // 4-wire: ESP has full control
+    uint8_t no_of_heater_elements_on = 2;  // 4-wire: heater element count
 };
 
 // Toggle requests structure - matches VA sToggles
@@ -98,6 +101,9 @@ struct sToggles {
     bool timer_pressed = false;
     bool up_pressed = false;
     bool down_pressed = false;
+    // 4-wire specific fields
+    bool godmode = false;           // 4-wire: ESP has full control
+    uint8_t no_of_heater_elements_on = 2;  // 4-wire: heater element count
 };
 
 // Toggle button indices for 4-wire state machine
