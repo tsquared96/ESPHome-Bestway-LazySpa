@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import text_sensor
-from . import bestway_spa_ns, BestwaySpa, CONF_BESTWAY_SPA_ID
+from . import BestwaySpa, CONF_BESTWAY_SPA_ID
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(CONF_BESTWAY_SPA_ID): cv.use_id(BestwaySpa),
