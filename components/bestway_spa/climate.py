@@ -13,17 +13,18 @@ PROTOCOL_TYPES = {
     "4WIRE": ProtocolType.PROTOCOL_4WIRE,
 }
 
+# Corrected for 2025.12: using gpio_pin_schema without arguments
 CONFIG_SCHEMA = climate.climate_schema(BestwaySpa).extend(
     {
         cv.Required("protocol_type"): cv.enum(PROTOCOL_TYPES, upper=True),
         # CIO Pins
-        cv.Required("cio_data_pin"): pins.gpio_pin_schema(input=True),
-        cv.Required("cio_clk_pin"): pins.gpio_pin_schema(input=True),
-        cv.Required("cio_cs_pin"): pins.gpio_pin_schema(input=True),
+        cv.Required("cio_data_pin"): pins.gpio_pin_schema(),
+        cv.Required("cio_clk_pin"): pins.gpio_pin_schema(),
+        cv.Required("cio_cs_pin"): pins.gpio_pin_schema(),
         # DSP Pins
-        cv.Optional("dsp_data_pin"): pins.gpio_pin_schema(input=True),
-        cv.Optional("dsp_clk_pin"): pins.gpio_pin_schema(input=True),
-        cv.Optional("dsp_cs_pin"): pins.gpio_pin_schema(input=True),
+        cv.Optional("dsp_data_pin"): pins.gpio_pin_schema(),
+        cv.Optional("dsp_clk_pin"): pins.gpio_pin_schema(),
+        cv.Optional("dsp_cs_pin"): pins.gpio_pin_schema(),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -34,7 +35,7 @@ async def to_code(config):
 
     cg.add(var.set_protocol_type(config["protocol_type"]))
     
-    # CIO Pin Setup - Now using gpio_pin_expression
+    # CIO Pin Setup
     cio_data = await cg.gpio_pin_expression(config["cio_data_pin"])
     cg.add(var.set_cio_data_pin(cio_data))
     cio_clk = await cg.gpio_pin_expression(config["cio_clk_pin"])
