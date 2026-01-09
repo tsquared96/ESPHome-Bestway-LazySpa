@@ -3,8 +3,6 @@
 # =============================================================================
 # For 6-wire TYPE1 protocol spas (pre-2021 "egg-style" pump models)
 #
-# Features: Air bubbles only (NO HydroJets on these models)
-#
 # Hardware: ESP8266 D1 Mini with VisualApproach MITM board
 #
 # Pin Configuration (matching VA firmware defaults):
@@ -16,7 +14,6 @@
 #     - GPIO12 (D6) = DSP Data
 #     - GPIO2  (D4) = DSP Clock
 #     - GPIO0  (D3) = DSP Chip Select
-#     - GPIO13 (D7) = DSP Audio (optional)
 # =============================================================================
 
 substitutions:
@@ -30,11 +27,9 @@ esphome:
 esp8266:
   board: d1_mini
 
-# Enable logging
 logger:
   level: INFO
 
-# Enable Home Assistant API
 api:
   encryption:
     key: !secret api_encryption_key
@@ -52,84 +47,92 @@ wifi:
 
 captive_portal:
 
-# Web server for local access
 web_server:
   port: 80
 
-# Bestway Spa component - PRE2021 6-wire TYPE1
+# External component source
 external_components:
   - source:
-      type: local
-      path: components
+      type: git
+      url: https://github.com/tsquared96/ESPHome-Bestway-LazySpa
+      ref: gemini-edits
+    components: [bestway_spa]
 
+# =============================================================================
+# Climate Platform - Main spa control
+# =============================================================================
 climate:
   - platform: bestway_spa
     id: spa
     name: "${friendly_name}"
+    protocol_type: 6WIRE_T1
 
-    # Model configuration - PRE2021 uses 6-wire TYPE1 protocol
-    protocol_type: 6WIRE
-    model: PRE2021
+    # CIO bus pins (input from pump controller)
+    cio_data_pin: GPIO5
+    cio_clk_pin: GPIO4
+    cio_cs_pin: GPIO14
 
-    # Anti-hibernate: Older egg-style pumps (TYPE1 protocol) have a 72-hour
-    # timer that puts the spa into hibernate mode (display shows "END").
-    # This feature auto-wakes the spa by pressing the lock button for 3 seconds.
-    # Only applies to 6-wire TYPE1 protocol. Default: true
-    prevent_hibernate: true
+    # DSP bus pins (output to physical display)
+    dsp_data_pin: GPIO12
+    dsp_clk_pin: GPIO2
+    dsp_cs_pin: GPIO0
 
-    # CIO bus pins (input from pump controller) - matches VA defaults
-    cio_data_pin: GPIO5    # D1
-    cio_clk_pin: GPIO4     # D2
-    cio_cs_pin: GPIO14     # D5
-
-    # DSP bus pins (output to physical display) - matches VA defaults
-    dsp_data_pin: GPIO12   # D6
-    dsp_clk_pin: GPIO2     # D4
-    dsp_cs_pin: GPIO0      # D3
-    audio_pin: GPIO13      # D7 (optional - for buzzer)
-
-    # Sensors
+# =============================================================================
+# Temperature Sensors
+# =============================================================================
+sensor:
+  - platform: bestway_spa
+    bestway_spa_id: spa
     current_temperature:
       name: "${friendly_name} Current Temperature"
+    target_temperature:
+      name: "${friendly_name} Target Temperature"
 
-    # Binary sensors for state monitoring
-    heating:
+# =============================================================================
+# Binary Sensors - State monitoring
+# =============================================================================
+binary_sensor:
+  - platform: bestway_spa
+    bestway_spa_id: spa
+    heating_sensor:
       name: "${friendly_name} Heating"
-    filter:
+    filter_sensor:
       name: "${friendly_name} Filter Pump"
-    bubbles:
+    bubbles_sensor:
       name: "${friendly_name} Bubbles"
-    locked:
-      name: "${friendly_name} Locked"
-    power:
-      name: "${friendly_name} Power"
-    error:
-      name: "${friendly_name} Error"
 
-    # Text sensors
-    error_text:
-      name: "${friendly_name} Error Code"
+# =============================================================================
+# Text Sensors
+# =============================================================================
+text_sensor:
+  - platform: bestway_spa
+    bestway_spa_id: spa
     display_text:
       name: "${friendly_name} Display"
 
-# Control switches
-switch:
-  - platform: bestway_spa
-    spa_id: spa
-    heater:
-      name: "${friendly_name} Heater"
-    filter:
-      name: "${friendly_name} Filter"
-    bubbles:
-      name: "${friendly_name} Air Jets"
-    lock:
-      name: "${friendly_name} Lock"
-    power:
-      name: "${friendly_name} Power"
-    unit:
-      name: "${friendly_name} Unit (C/F)"
-
-# Restart button
+# =============================================================================
+# Manual Button Controls (using lambdas)
+# =============================================================================
 button:
+  - platform: template
+    name: "${friendly_name} Bubbles Toggle"
+    on_press:
+      - lambda: 'id(spa).on_button_press_(esphome::bestway_spa::BUBBLES);'
+
+  - platform: template
+    name: "${friendly_name} Pump Toggle"
+    on_press:
+      - lambda: 'id(spa).on_button_press_(esphome::bestway_spa::PUMP);'
+
+  - platform: template
+    name: "${friendly_name} Heat Toggle"
+    on_press:
+      - lambda: 'id(spa).on_button_press_(esphome::bestway_spa::HEAT);'
+
+  - platform: template
+    name: "${friendly_name} Lock Toggle"
+    on_press:
+      - lambda: 'id(spa).on_button_press_(esphome::bestway_spa::LOCK);'
+
   - platform: restart
     name: "${friendly_name} Restart"
