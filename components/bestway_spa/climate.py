@@ -13,18 +13,17 @@ PROTOCOL_TYPES = {
     "4WIRE": ProtocolType.PROTOCOL_4WIRE,
 }
 
-# Fixed for ESPHome 2024.x/2025.x - Using climate_schema function
 CONFIG_SCHEMA = climate.climate_schema(BestwaySpa).extend(
     {
         cv.Required("protocol_type"): cv.enum(PROTOCOL_TYPES, upper=True),
         # CIO Pins
-        cv.Required("cio_data_pin"): pins.internal_gpio_pin_number,
-        cv.Required("cio_clk_pin"): pins.internal_gpio_pin_number,
-        cv.Required("cio_cs_pin"): pins.internal_gpio_pin_number,
+        cv.Required("cio_data_pin"): pins.gpio_pin_schema(input=True),
+        cv.Required("cio_clk_pin"): pins.gpio_pin_schema(input=True),
+        cv.Required("cio_cs_pin"): pins.gpio_pin_schema(input=True),
         # DSP Pins
-        cv.Optional("dsp_data_pin"): pins.internal_gpio_pin_number,
-        cv.Optional("dsp_clk_pin"): pins.internal_gpio_pin_number,
-        cv.Optional("dsp_cs_pin"): pins.internal_gpio_pin_number,
+        cv.Optional("dsp_data_pin"): pins.gpio_pin_schema(input=True),
+        cv.Optional("dsp_clk_pin"): pins.gpio_pin_schema(input=True),
+        cv.Optional("dsp_cs_pin"): pins.gpio_pin_schema(input=True),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -35,21 +34,21 @@ async def to_code(config):
 
     cg.add(var.set_protocol_type(config["protocol_type"]))
     
-    # CIO Pin Setup
-    cio_data = await cg.get_variable(config["cio_data_pin"])
+    # CIO Pin Setup - Now using gpio_pin_expression
+    cio_data = await cg.gpio_pin_expression(config["cio_data_pin"])
     cg.add(var.set_cio_data_pin(cio_data))
-    cio_clk = await cg.get_variable(config["cio_clk_pin"])
+    cio_clk = await cg.gpio_pin_expression(config["cio_clk_pin"])
     cg.add(var.set_cio_clk_pin(cio_clk))
-    cio_cs = await cg.get_variable(config["cio_cs_pin"])
+    cio_cs = await cg.gpio_pin_expression(config["cio_cs_pin"])
     cg.add(var.set_cio_cs_pin(cio_cs))
 
     # DSP Pin Setup
     if "dsp_data_pin" in config:
-        dsp_data = await cg.get_variable(config["dsp_data_pin"])
+        dsp_data = await cg.gpio_pin_expression(config["dsp_data_pin"])
         cg.add(var.set_dsp_data_pin(dsp_data))
     if "dsp_clk_pin" in config:
-        dsp_clk = await cg.get_variable(config["dsp_clk_pin"])
+        dsp_clk = await cg.gpio_pin_expression(config["dsp_clk_pin"])
         cg.add(var.set_dsp_clk_pin(dsp_clk))
     if "dsp_cs_pin" in config:
-        dsp_cs = await cg.get_variable(config["dsp_cs_pin"])
+        dsp_cs = await cg.gpio_pin_expression(config["dsp_cs_pin"])
         cg.add(var.set_dsp_cs_pin(dsp_cs))
