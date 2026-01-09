@@ -231,58 +231,65 @@ void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
     bool clockstate = digitalRead(_CLK_PIN);
 #endif
 
-    // Rising edge: output button bits OR read data bits
-    if (clockstate) {
-        if (_data_is_output) {
-            // Output button bits on rising edge (data sampled on falling edge by pump)
-            button_bits_sent++;  // Debug: count bits transmitted
-            if (_button_code & (1 << _send_bit)) {
+    // Falling edge: shift out button bits (per VA docs: "shift out on falling edge")
+    // LSB first per VA docs
+    if (!clockstate && _data_is_output) {
+        button_bits_sent++;  // Debug: count bits transmitted
+        if (_button_code & (1 << _send_bit)) {
 #ifdef ESP8266
-                WRITE_PERI_REG(PIN_OUT_SET, 1 << _DATA_PIN);
+            WRITE_PERI_REG(PIN_OUT_SET, 1 << _DATA_PIN);
 #else
-                digitalWrite(_DATA_PIN, 1);
+            digitalWrite(_DATA_PIN, 1);
 #endif
-            } else {
-#ifdef ESP8266
-                WRITE_PERI_REG(PIN_OUT_CLEAR, 1 << _DATA_PIN);
-#else
-                digitalWrite(_DATA_PIN, 0);
-#endif
-            }
-            _send_bit++;
-            if (_send_bit > 15) _send_bit = 0;
         } else {
-            // Read data bits on rising edge
 #ifdef ESP8266
-            _received_byte = (_received_byte >> 1) | (((READ_PERI_REG(PIN_IN) & (1 << _DATA_PIN)) > 0) << 7);
+            WRITE_PERI_REG(PIN_OUT_CLEAR, 1 << _DATA_PIN);
 #else
-            _received_byte = (_received_byte >> 1) | (digitalRead(_DATA_PIN) << 7);
+            digitalWrite(_DATA_PIN, 0);
 #endif
-            _bit_count++;
-            if (_bit_count == 8) {
-                _bit_count = 0;
+        }
+        _send_bit++;
+        if (_send_bit > 15) _send_bit = 0;
+    }
 
-                // Store payload bytes
-                if (_CIO_cmd_matches == 2) {
-                    if (_byte_count < 11) {
-                        _payload[_byte_count] = _received_byte;
-                        _byte_count++;
-                    } else {
-                        _packet_error |= 4;
-                    }
-                }
-                // Check for button read request
-                else if (_received_byte == DSP_CMD2_DATAREAD) {
-                    _send_bit = 0;  // Start at bit 0 (low byte first)
-                    _data_is_output = true;
-                    cmd_read_count++;  // Debug: count 0x42 commands received
-                    last_btn_transmitted = _button_code;  // Debug: track what we're sending
+    // Rising edge: latch/read data bits (per VA docs: "latch on rising edge")
+    if (clockstate && !_data_is_output) {
 #ifdef ESP8266
-                    WRITE_PERI_REG(PIN_DIR_OUTPUT, 1 << _DATA_PIN);
+        _received_byte = (_received_byte >> 1) | (((READ_PERI_REG(PIN_IN) & (1 << _DATA_PIN)) > 0) << 7);
 #else
-                    pinMode(_DATA_PIN, OUTPUT);
+        _received_byte = (_received_byte >> 1) | (digitalRead(_DATA_PIN) << 7);
 #endif
+        _bit_count++;
+        if (_bit_count == 8) {
+            _bit_count = 0;
+
+            // Store payload bytes
+            if (_CIO_cmd_matches == 2) {
+                if (_byte_count < 11) {
+                    _payload[_byte_count] = _received_byte;
+                    _byte_count++;
+                } else {
+                    _packet_error |= 4;
                 }
+            }
+            // Check for button read request
+            else if (_received_byte == DSP_CMD2_DATAREAD) {
+                _data_is_output = true;
+                cmd_read_count++;  // Debug: count 0x42 commands received
+                last_btn_transmitted = _button_code;  // Debug: track what we're sending
+#ifdef ESP8266
+                WRITE_PERI_REG(PIN_DIR_OUTPUT, 1 << _DATA_PIN);
+                // Immediately output first bit (bit 0) - don't wait for falling edge
+                if (_button_code & (1 << 0)) {
+                    WRITE_PERI_REG(PIN_OUT_SET, 1 << _DATA_PIN);
+                } else {
+                    WRITE_PERI_REG(PIN_OUT_CLEAR, 1 << _DATA_PIN);
+                }
+#else
+                pinMode(_DATA_PIN, OUTPUT);
+                digitalWrite(_DATA_PIN, (_button_code & 1) ? 1 : 0);
+#endif
+                _send_bit = 1;  // Start at bit 1 since we already output bit 0
             }
         }
     }
