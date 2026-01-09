@@ -278,6 +278,10 @@ void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
                 _data_is_output = true;
                 cmd_read_count++;  // Debug
                 last_btn_transmitted = _button_code;  // Debug
+                // Count non-NOBTN button presses (NOBTN is 0x1B1B for PRE2021)
+                if (_button_code != 0x1B1B && _button_code != 0x0000) {
+                    btn_press_count++;
+                }
 #ifdef ESP8266
                 WRITE_PERI_REG(PIN_DIR_OUTPUT, 1 << _DATA_PIN);
 #else

@@ -58,6 +58,7 @@ public:
     volatile uint32_t cmd_read_count = 0;      // Times 0x42 (button read) received
     volatile uint32_t button_bits_sent = 0;    // Button bits transmitted
     volatile uint16_t last_btn_transmitted = 0; // Last button code we tried to send
+    volatile uint32_t btn_press_count = 0;     // Times we transmitted a non-NOBTN button
 
     // Raw payload for DSP forwarding
     uint8_t _raw_payload_from_cio[11];

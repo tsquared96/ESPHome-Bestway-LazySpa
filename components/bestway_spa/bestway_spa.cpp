@@ -286,10 +286,12 @@ void BestwaySpa::loop() {
                  (unsigned long)va_cio_type1.cmd_read_count,
                  (unsigned long)va_cio_type1.button_bits_sent);
       } else {
-        ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | Btn:0x%04X | 0x42:%lu bits:%lu",
+        ESP_LOGI(TAG, "CIO: pkts=%lu(+%lu) bad=%lu | Btn:0x%04X ISR:0x%04X presses:%lu | 0x42:%lu bits:%lu",
                  (unsigned long)va_cio_type1.good_packets_count, (unsigned long)pkt_delta,
                  (unsigned long)bad_packets,
                  current_button_code_,
+                 (uint16_t)va_cio_type1.last_btn_transmitted,
+                 (unsigned long)va_cio_type1.btn_press_count,
                  (unsigned long)va_cio_type1.cmd_read_count,
                  (unsigned long)va_cio_type1.button_bits_sent);
       }
