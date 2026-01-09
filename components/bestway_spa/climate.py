@@ -1,8 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import climate
-# This is the secret sauce for 2025.12.5
-from esphome.components.climate import CLIMATE_SCHEMA
 from esphome.const import CONF_ID
 from esphome import pins
 from . import bestway_spa_ns, BestwaySpa
@@ -15,10 +13,9 @@ PROTOCOL_TYPES = {
     "4WIRE": ProtocolType.PROTOCOL_4WIRE,
 }
 
-# Now we use the imported CLIMATE_SCHEMA directly
-CONFIG_SCHEMA = CLIMATE_SCHEMA.extend(
+# 2025.12.5 approach: climate_schema() is a function, not a variable.
+CONFIG_SCHEMA = climate.climate_schema(BestwaySpa).extend(
     {
-        cv.GenerateID(): cv.declare_id(BestwaySpa),
         cv.Required("protocol_type"): cv.enum(PROTOCOL_TYPES, upper=True),
         # CIO Pins
         cv.Required("cio_data_pin"): pins.gpio_pin_schema(default_mode="INPUT"),
