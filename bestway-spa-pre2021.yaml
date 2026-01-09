@@ -7,16 +7,16 @@
 #
 # Hardware: ESP8266 D1 Mini with VisualApproach MITM board
 #
-# Pin Configuration (per VA documentation):
+# Pin Configuration (matching VA firmware defaults):
 #   CIO Bus (from pump controller):
-#     - GPIO13 (D7) = CIO Data
+#     - GPIO5  (D1) = CIO Data
 #     - GPIO4  (D2) = CIO Clock
-#     - GPIO5  (D1) = CIO Chip Select
+#     - GPIO14 (D5) = CIO Chip Select
 #   DSP Bus (to physical display):
-#     - GPIO14 (D5) = DSP Data
+#     - GPIO12 (D6) = DSP Data
 #     - GPIO2  (D4) = DSP Clock
 #     - GPIO0  (D3) = DSP Chip Select
-#     - GPIO12 (D6) = DSP Audio (optional)
+#     - GPIO13 (D7) = DSP Audio (optional)
 # =============================================================================
 
 substitutions:
@@ -77,16 +77,16 @@ climate:
     # Only applies to 6-wire TYPE1 protocol. Default: true
     prevent_hibernate: true
 
-    # CIO bus pins (input from pump controller)
-    cio_data_pin: GPIO13   # D7
+    # CIO bus pins (input from pump controller) - matches VA defaults
+    cio_data_pin: GPIO5    # D1
     cio_clk_pin: GPIO4     # D2
-    cio_cs_pin: GPIO5      # D1
+    cio_cs_pin: GPIO14     # D5
 
-    # DSP bus pins (output to physical display)
-    dsp_data_pin: GPIO14   # D5
+    # DSP bus pins (output to physical display) - matches VA defaults
+    dsp_data_pin: GPIO12   # D6
     dsp_clk_pin: GPIO2     # D4
     dsp_cs_pin: GPIO0      # D3
-    audio_pin: GPIO12      # D6 (optional - for buzzer)
+    audio_pin: GPIO13      # D7 (optional - for buzzer)
 
     # Sensors
     current_temperature:

@@ -106,18 +106,18 @@ climate:
 
     # --- Option B: 6-Wire TYPE1 (Pre-2021 models) ---
     # MITM dual-bus architecture - separate CIO input and DSP output buses
-    # Based on VisualApproach hardware design
+    # Based on VisualApproach hardware design (matches VA firmware defaults)
     protocol_type: 6WIRE
     model: PRE2021
-    # CIO bus (from pump controller) - per VA documentation
-    cio_data_pin: GPIO13  # D7 → CIO Data (pin 3)
-    cio_clk_pin: GPIO4    # D2 → CIO Clock (pin 4)
-    cio_cs_pin: GPIO5     # D1 → CIO Chip Select (pin 5)
-    # DSP bus (to physical display) - per VA documentation
-    dsp_data_pin: GPIO14  # D5 → DSP Data (pin 3)
-    dsp_clk_pin: GPIO2    # D4 → DSP Clock (pin 4)
-    dsp_cs_pin: GPIO0     # D3 → DSP Chip Select (pin 5)
-    audio_pin: GPIO12     # D6 → DSP Audio (pin 6)
+    # CIO bus (from pump controller) - matches VA firmware defaults
+    cio_data_pin: GPIO5   # D1 → CIO Data
+    cio_clk_pin: GPIO4    # D2 → CIO Clock
+    cio_cs_pin: GPIO14    # D5 → CIO Chip Select
+    # DSP bus (to physical display) - matches VA firmware defaults
+    dsp_data_pin: GPIO12  # D6 → DSP Data
+    dsp_clk_pin: GPIO2    # D4 → DSP Clock
+    dsp_cs_pin: GPIO0     # D3 → DSP Chip Select
+    audio_pin: GPIO13     # D7 → DSP Audio
 
     # --- Option C: 6-Wire TYPE2 (54149E model) ---
     # protocol_type: 6WIRE_T2

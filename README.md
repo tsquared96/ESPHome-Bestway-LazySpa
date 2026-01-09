@@ -154,20 +154,22 @@ climate:
 
 ### 6-Wire Models (MITM Dual-Bus)
 
-Per VisualApproach documentation:
+Matching VisualApproach firmware defaults:
 
 ```
 CIO Bus (from pump controller - INPUT):
-  GPIO13 (D7) = CIO Data
+  GPIO5  (D1) = CIO Data
   GPIO4  (D2) = CIO Clock
-  GPIO5  (D1) = CIO Chip Select
+  GPIO14 (D5) = CIO Chip Select
 
 DSP Bus (to physical display - OUTPUT):
-  GPIO14 (D5) = DSP Data
+  GPIO12 (D6) = DSP Data
   GPIO2  (D4) = DSP Clock
   GPIO0  (D3) = DSP Chip Select
-  GPIO12 (D6) = DSP Audio (optional buzzer)
+  GPIO13 (D7) = DSP Audio (optional buzzer)
 ```
+
+**Note:** These match the VA firmware defaults. If you customized pins in VA, update YAML accordingly.
 
 ### 4-Wire Models (UART)
 
@@ -237,16 +239,16 @@ climate:
     # Anti-hibernate (TYPE1 only)
     prevent_hibernate: true
 
-    # CIO bus pins (input from pump controller)
-    cio_data_pin: GPIO13
+    # CIO bus pins (input from pump controller) - VA defaults
+    cio_data_pin: GPIO5
     cio_clk_pin: GPIO4
-    cio_cs_pin: GPIO5
+    cio_cs_pin: GPIO14
 
-    # DSP bus pins (output to physical display)
-    dsp_data_pin: GPIO14
+    # DSP bus pins (output to physical display) - VA defaults
+    dsp_data_pin: GPIO12
     dsp_clk_pin: GPIO2
     dsp_cs_pin: GPIO0
-    audio_pin: GPIO12
+    audio_pin: GPIO13
 
     # Sensors
     current_temperature:
