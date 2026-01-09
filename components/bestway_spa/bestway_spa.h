@@ -55,15 +55,17 @@ class BestwaySpa : public climate::Climate, public Component {
   void set_dsp_cs_pin(InternalGPIOPin *pin) { dsp_cs_pin_ = pin; }
   void set_audio_pin(InternalGPIOPin *pin) { audio_pin_ = pin; }
 
+  // Public method for the lambda buttons in your YAML
+  void on_button_press_(Buttons btn);
+
  protected:
   void handle_6wire_protocol_();
-  void handle_4wire_protocol_() {} // Placeholder
+  void handle_4wire_protocol_() {} 
   void process_button_queue_();
-  void on_button_press_(Buttons btn);
 
   // VA Drivers
   bestway_va::CIO_PRE2021 va_cio_type1;
-  bestway_va::DSP_PRE2021 va_dsp_type1;
+  bestway_va::DSP_TYPE1 va_dsp_type1; // Fixed: Matches class name in DSP_TYPE1.h
 
   // Pins
   ProtocolType protocol_type_{PROTOCOL_6WIRE_T1};
