@@ -1,5 +1,6 @@
 #pragma once
 
+#include <queue>  // <--- CRITICAL: Add this for the button queue
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
 #include "esphome/components/climate/climate.h"
