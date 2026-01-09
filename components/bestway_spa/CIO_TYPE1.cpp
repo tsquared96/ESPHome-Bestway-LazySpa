@@ -233,6 +233,7 @@ void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
 
     // Falling edge: shift out button bits
     if (!clockstate && _data_is_output) {
+        button_bits_sent++;  // Debug: count bits transmitted
         if (_button_code & (1 << _send_bit)) {
 #ifdef ESP8266
             WRITE_PERI_REG(PIN_OUT_SET, 1 << _DATA_PIN);
@@ -274,6 +275,8 @@ void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
             else if (_received_byte == DSP_CMD2_DATAREAD) {
                 _send_bit = 8;
                 _data_is_output = true;
+                cmd_read_count++;  // Debug: count 0x42 commands received
+                last_btn_transmitted = _button_code;  // Debug: track what we're sending
 #ifdef ESP8266
                 WRITE_PERI_REG(PIN_DIR_OUTPUT, 1 << _DATA_PIN);
 #else

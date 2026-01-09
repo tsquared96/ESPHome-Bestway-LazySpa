@@ -54,6 +54,11 @@ public:
     uint32_t bad_packets_count = 0;
     uint8_t packet_error = 0;
 
+    // Debug counters for button transmission
+    volatile uint32_t cmd_read_count = 0;      // Times 0x42 (button read) received
+    volatile uint32_t button_bits_sent = 0;    // Button bits transmitted
+    volatile uint16_t last_btn_transmitted = 0; // Last button code we tried to send
+
     // Raw payload for DSP forwarding
     uint8_t _raw_payload_from_cio[11];
 
