@@ -1,73 +1,65 @@
-#pragma once
-#include <Arduino.h>
-#include "enums.h"
+#include "CIO_TYPE1.h"
 
 namespace bestway_va {
 
-class CIO_TYPE1 {
-public:
-    CIO_TYPE1();
-    void setup(int cio_data_pin, int cio_clk_pin, int cio_cs_pin);
-    void stop();
-    void updateStates();
-    void setButtonCode(uint16_t code) { _button_code = code; }
-    virtual uint16_t getButtonCode(Buttons button_index) = 0;
-    virtual bool getHasjets() = 0;
-    virtual bool getHasair() = 0;
+CIO_TYPE1* g_cio_instance = nullptr;
 
-    // ISRs must be in IRAM for speed
-    void IRAM_ATTR isr_packetHandler();
-    void IRAM_ATTR isr_clkHandler();
+static void IRAM_ATTR isr_cs_wrapper() { if (g_cio_instance) g_cio_instance->isr_packetHandler(); }
+static void IRAM_ATTR isr_clk_wrapper() { if (g_cio_instance) g_cio_instance->isr_clkHandler(); }
 
-    sStates cio_states;
-    uint32_t good_packets_count = 0;
-    uint32_t bad_packets_count = 0;
-    
-    // Debug counters
-    volatile uint32_t cmd_read_count = 0;
-    volatile uint32_t button_bits_sent = 0;
+// ... [Keep CHARCODES and CHARS arrays from your previous version] ...
 
-protected:
-    void IRAM_ATTR eopHandler();
-    char _getChar(uint8_t value);
+void IRAM_ATTR CIO_TYPE1::isr_clkHandler() {
+    if (!_packet_transm_active) return;
 
-    int _DATA_PIN;
-    int _CLK_PIN;
-    int _CS_PIN;
+    // Direct register read for instantaneous state capture
+    uint32_t gpio_status = READ_PERI_REG(PIN_IN);
+    bool clockstate = gpio_status & (1 << _CLK_PIN);
 
-    volatile int _byte_count;
-    volatile int _bit_count;
-    volatile int _CIO_cmd_matches;
-    volatile int _send_bit;
-    volatile uint8_t _received_byte;
-    volatile uint8_t _brightness;
-    volatile uint8_t _payload[11];
-    volatile bool _data_is_output;
-    volatile bool _new_packet_available;
-    volatile bool _packet_transm_active;
-    volatile uint16_t _button_code;
+    // 1. FALLING EDGE: Send button bits to the pump
+    if (!clockstate && _data_is_output) {
+        if (_button_code & (1 << _send_bit)) {
+            WRITE_PERI_REG(PIN_OUT_SET, 1 << _DATA_PIN);
+        } else {
+            WRITE_PERI_REG(PIN_OUT_CLEAR, 1 << _DATA_PIN);
+        }
+        _send_bit++;
+        if (_send_bit > 15) _send_bit = 0;
+        return; 
+    }
 
-    static const uint8_t DSP_CMD1_MODE6_11_7 = 0x01;
-    static const uint8_t DSP_CMD1_MODE6_11_7_P05504 = 0x05;
-    static const uint8_t DSP_CMD2_DATAREAD = 0x42;
-    static const uint8_t DSP_CMD2_DATAWRITE = 0x40;
+    // 2. RISING EDGE: Read data from the pump
+    if (clockstate && !_data_is_output) {
+        _received_byte = (_received_byte >> 1) | (((gpio_status & (1 << _DATA_PIN)) > 0) << 7);
+        _bit_count++;
+        
+        if (_bit_count == 8) {
+            _bit_count = 0;
 
-    static const uint32_t PIN_IN = 0x60000318;
-    static const uint32_t PIN_OUT_SET = 0x60000304;
-    static const uint32_t PIN_OUT_CLEAR = 0x60000308;
-    static const uint32_t PIN_DIR_INPUT = 0x60000314;
-    static const uint32_t PIN_DIR_OUTPUT = 0x60000310;
-};
+            if (_CIO_cmd_matches == 2 && _byte_count < 11) {
+                _payload[_byte_count++] = _received_byte;
+            } 
+            // THE CRITICAL FIX: Faster transition to output mode
+            else if (_received_byte == DSP_CMD2_DATAREAD) {
+                _send_bit = 8; 
+                _data_is_output = true;
+                
+                // Set Pin to Output
+                WRITE_PERI_REG(PIN_DIR_OUTPUT, 1 << _DATA_PIN);
+                
+                // Push first bit IMMEDIATELY before the next falling edge
+                if (_button_code & (1 << _send_bit)) {
+                    WRITE_PERI_REG(PIN_OUT_SET, 1 << _DATA_PIN);
+                } else {
+                    WRITE_PERI_REG(PIN_OUT_CLEAR, 1 << _DATA_PIN);
+                }
+                _send_bit++;
+                cmd_read_count++;
+            }
+        }
+    }
+}
 
-class CIO_PRE2021 : public CIO_TYPE1 {
-public:
-    uint16_t getButtonCode(Buttons button_index) override;
-    bool getHasjets() override { return false; }
-    bool getHasair() override { return true; }
-private:
-    static const uint16_t _button_codes[11];
-};
-
-extern CIO_TYPE1* g_cio_instance;
+// ... [Keep updateStates and eopHandler logic] ...
 
 }
