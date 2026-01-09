@@ -36,7 +36,7 @@ async def to_code(config):
 
     cg.add(var.set_protocol_type(config["protocol_type"]))
     
-    # CIO Pin Setup
+    # This block converts the YAML dictionary into the C++ InternalGPIOPin*
     cio_data = await cg.gpio_pin_expression(config["cio_data_pin"])
     cg.add(var.set_cio_data_pin(cio_data))
     cio_clk = await cg.gpio_pin_expression(config["cio_clk_pin"])
