@@ -1,6 +1,8 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import climate
+# This is the secret sauce for 2025.12.5
+from esphome.components.climate import CLIMATE_SCHEMA
 from esphome.const import CONF_ID
 from esphome import pins
 from . import bestway_spa_ns, BestwaySpa
@@ -13,11 +15,8 @@ PROTOCOL_TYPES = {
     "4WIRE": ProtocolType.PROTOCOL_4WIRE,
 }
 
-# 2025.12.5 Strategy: 
-# 1. Use climate.CLIMATE_SCHEMA as a base (handles id, name, icon)
-# 2. Extend it with your custom pins and settings
-# 3. Use climate_schema function inside to_code
-CONFIG_SCHEMA = climate.CLIMATE_SCHEMA.extend(
+# Now we use the imported CLIMATE_SCHEMA directly
+CONFIG_SCHEMA = CLIMATE_SCHEMA.extend(
     {
         cv.GenerateID(): cv.declare_id(BestwaySpa),
         cv.Required("protocol_type"): cv.enum(PROTOCOL_TYPES, upper=True),
@@ -39,7 +38,7 @@ async def to_code(config):
 
     cg.add(var.set_protocol_type(config["protocol_type"]))
     
-    # Use gpio_pin_expression for pins
+    # CIO Pin Setup
     cio_data = await cg.gpio_pin_expression(config["cio_data_pin"])
     cg.add(var.set_cio_data_pin(cio_data))
     cio_clk = await cg.gpio_pin_expression(config["cio_clk_pin"])
@@ -47,6 +46,7 @@ async def to_code(config):
     cio_cs = await cg.gpio_pin_expression(config["cio_cs_pin"])
     cg.add(var.set_cio_cs_pin(cio_cs))
 
+    # DSP Pin Setup
     if "dsp_data_pin" in config:
         dsp_data = await cg.gpio_pin_expression(config["dsp_data_pin"])
         cg.add(var.set_dsp_data_pin(dsp_data))
